@@ -10,17 +10,21 @@
  */
 
 import * as Flexbox from '../Renderer/FlexboxImplementation';
-import Image from '../Renderer/Views/Image';
 import type RenderRoot from '../Renderer/RenderRoot';
-import RawText from '../Renderer/Views/RawText';
-import type ShadowView, {Dispatcher} from '../Renderer/Views/ShadowView';
-import ShadowViewWebGL from '../Renderer/Views/ShadowViewWebGL';
-import Text from '../Renderer/Views/Text';
-import View from '../Renderer/Views/View';
+
+import {
+  Image,
+  RawText,
+  Text,
+  View,
+  ShadowViewWebGL,
+  SDFTextImplementation,
+  type ShadowView,
+  type Dispatcher,
+  type TextImplementation,
+} from 'webgl-ui';
 
 import Module from '../Modules/Module';
-import SDFTextImplementation from '../Text/Implementations/SDFTextImplementation';
-import type {TextImplementation} from '../Text/TextTypes';
 import type ReactContext from './ReactContext';
 
 type Attributes = {[attr: string]: any};
@@ -48,7 +52,7 @@ export default class UIManager extends Module {
   _viewTypeCreators: {[t: string]: ViewCreator};
   _viewDispatchers: {[name: string]: Dispatcher};
 
-  constructor(ctx: ReactContext) {
+  constructor(ctx: ReactContext, ti?: TextImplementation) {
     super('UIManager');
     this._ctx = ctx;
     this._nextRootTag = 1;
@@ -59,7 +63,7 @@ export default class UIManager extends Module {
     this._viewTypeCreators = {};
     this._viewDispatchers = {};
 
-    this._textImplementation = new SDFTextImplementation();
+    this._textImplementation = ti || new SDFTextImplementation();
 
     (this: any).customDirectEventTypes = {
       topLayout: {registrationName: 'onLayout'},
@@ -96,33 +100,25 @@ export default class UIManager extends Module {
       },
     };
 
-    this.registerViewType(
-      'RCTView',
-      View.registerBindings.bind(View),
-      () => new View(),
-    );
+    this.registerViewType('RCTView', View.registerBindings.bind(View), () => new View());
     this.registerViewType(
       'RCTImageView',
       Image.registerBindings.bind(Image),
-      () => new Image(),
+      () => new Image(ctx.TextureManager)
     );
     this.registerViewType(
       'RCTText',
       Text.registerBindings.bind(Text),
-      () => new Text(this._textImplementation),
+      () => new Text(this._textImplementation)
     );
     this.registerViewType(
       'RCTRawText',
       RawText.registerBindings.bind(RawText),
-      () => new RawText(),
+      () => new RawText()
     );
   }
 
-  registerViewType(
-    name: string,
-    registerBindings: Dispatcher => void,
-    viewCreator: ViewCreator,
-  ) {
+  registerViewType(name: string, registerBindings: Dispatcher => void, viewCreator: ViewCreator) {
     const dispatch = {};
     registerBindings(dispatch);
     this._viewDispatchers[name] = dispatch;
@@ -218,7 +214,7 @@ export default class UIManager extends Module {
     moveTo: ?Array<number>,
     addChildTags: Array<number>,
     addAtIndices: Array<number>,
-    removeFrom: Array<number>,
+    removeFrom: Array<number>
   ) {
     const parent = this._views[tag];
     if (!parent) {
@@ -304,11 +300,7 @@ export default class UIManager extends Module {
       if (!root) {
         continue;
       }
-      root.YGNode.calculateLayout(
-        Flexbox.UNDEFINED,
-        Flexbox.UNDEFINED,
-        Flexbox.DIRECTION_LTR,
-      );
+      root.YGNode.calculateLayout(Flexbox.UNDEFINED, Flexbox.UNDEFINED, Flexbox.DIRECTION_LTR);
       // Layout children recursively in root-to-leaf order, so that parents
       // are guaranteed to update before their children
       recursiveLayout(root);
