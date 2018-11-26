@@ -34,9 +34,12 @@ import AudioModule from './Modules/AudioModule';
 import EnvironmentModule from './Modules/EnvironmentModule';
 import VideoModule from './Modules/VideoModule';
 import type Module from './Modules/Module';
-import type { CustomView } from './Modules/UIManager';
-import Runtime, { type NativeModuleInitializer } from './Runtime/Runtime';
-import { rotateByQuaternion } from './Renderer/Math';
+import type {CustomView} from './Modules/UIManager';
+import Runtime, {type NativeModuleInitializer} from './Runtime/Runtime';
+import {Math as GLMath, type TextImplementation} from 'webgl-ui';
+import EventEmitter from 'eventemitter3';
+
+const {rotateByQuaternion} = GLMath;
 
 type Root = {
   initialProps: Object,
@@ -70,6 +73,15 @@ export type React360Options = {
   fullScreen?: boolean,
   nativeModules?: Array<Module | NativeModuleInitializer>,
   eventLayer: HTMLElement,
+  textImplementation?: TextImplementation,
+  useNewViews?: boolean,
+};
+
+export type React360Event = {
+  type: string, // type of the event
+  timeStamp: number, // time stamp of the event
+  error?: string, // if the event is an error, this will provide error message
+  payload?: Object, // if the event has extra information, will provide in payload
 };
 
 const DEFAULT_SURFACE_DEPTH = 4;
@@ -103,16 +115,13 @@ export default class ReactInstance {
   runtime: Runtime;
   scene: THREE.Scene;
   vrState: VRState;
+  eventEmitter: EventEmitter;
 
   /**
    * Create a new instance of a React 360 app, given a path to the React 360 JS
    * bundle and a DOM component to mount within.
    */
-  constructor(
-    bundle: string,
-    parent: HTMLElement,
-    options: React360Options = {},
-  ) {
+  constructor(bundle: string, parent: HTMLElement, options: React360Options = {}) {
     (this: any).enterVR = this.enterVR.bind(this);
     (this: any).frame = this.frame.bind(this);
     (this: any)._onResize = this._onResize.bind(this);
@@ -183,20 +192,22 @@ export default class ReactInstance {
           return audio;
         },
         ctx => {
-          const video = new VideoModule(
-            this.compositor.getVideoPlayerManager(),
-          );
+          const video = new VideoModule(ctx, this.compositor.getVideoPlayerManager());
           this._videoModule = video;
           return video;
         },
         ...(options.nativeModules || []),
       ],
+      textImplementation: options.textImplementation,
+      useNewViews: options.useNewViews,
     };
+
     this.runtime = new Runtime(
       this.scene,
       bundle ? bundleFromLocation(bundle) : '',
       runtimeOptions,
     );
+
     const glRenderer = this.compositor.getRenderer();
     this.vrState = new VRState(glRenderer);
     this.vrState.onDisplayChange(display => {
@@ -206,19 +217,12 @@ export default class ReactInstance {
         this.overlay.setVRButtonState(false, 'No Headset', null);
       }
     });
-    this.vrState.onExit(() => {
-      this._needsResize = true;
-    });
+    this.vrState.onExit(this._onExitVR.bind(this));
+    this.eventEmitter = new EventEmitter();
 
-    this.controls.addCameraController(
-      new DeviceOrientationCameraController(this._eventLayer),
-    );
-    this.controls.addCameraController(
-      new MousePanCameraController(this._eventLayer),
-    );
-    this.controls.addCameraController(
-      new ScrollPanCameraController(this._eventLayer),
-    );
+    this.controls.addCameraController(new DeviceOrientationCameraController(this._eventLayer));
+    this.controls.addCameraController(new MousePanCameraController(this._eventLayer));
+    this.controls.addCameraController(new ScrollPanCameraController(this._eventLayer));
     this.controls.addEventChannel(new MouseInputChannel(this._eventLayer));
     this.controls.addEventChannel(new TouchInputChannel(this._eventLayer));
     this.controls.addEventChannel(new KeyboardInputChannel());
@@ -226,6 +230,10 @@ export default class ReactInstance {
     this.controls.addRaycaster(new ControllerRaycaster());
     this.controls.addRaycaster(new MouseRaycaster(this._eventLayer));
     this.controls.addRaycaster(new TouchRaycaster(this._eventLayer));
+  }
+
+  emitEvent(event: React360Event) {
+    this.eventEmitter.emit(event.type, event);
   }
 
   _onResize() {
@@ -305,10 +313,7 @@ export default class ReactInstance {
         this._cameraQuat[3] = orientation[3];
       }
     } else {
-      this.controls.fillCameraProperties(
-        this._cameraPosition,
-        this._cameraQuat,
-      );
+      this.controls.fillCameraProperties(this._cameraPosition, this._cameraQuat);
     }
     if (this._rays.length > 0) {
       for (let i = 0; i < this._rays.length; i++) {
@@ -331,10 +336,7 @@ export default class ReactInstance {
     }
     this.runtime.queueEvents(this._events);
     // Update each view
-    this.runtime.frame(
-      this.compositor.getCamera(),
-      this.compositor.getRenderer(),
-    );
+    this.runtime.frame(this.compositor.getCamera(), this.compositor.getRenderer());
     if (this._audioModule) {
       const audioModule = this._audioModule;
       audioModule._setCameraParameters(this._cameraPosition, this._cameraQuat);
@@ -456,13 +458,9 @@ export default class ReactInstance {
    * out-of-VR use cases.
    */
   focusSurface(name?: string) {
-    const surface = name
-      ? this.compositor.getSurface(name)
-      : this.compositor.getDefaultSurface();
+    const surface = name ? this.compositor.getSurface(name) : this.compositor.getDefaultSurface();
     if (!surface) {
-      throw new Error(
-        `Cannot focus Surface ${name || ''}, it is not registered`,
-      );
+      throw new Error(`Cannot focus Surface ${name || ''}, it is not registered`);
     }
     const canvas = this.compositor.getCanvas();
     this._appearanceStateStack.push({
@@ -525,8 +523,24 @@ export default class ReactInstance {
    *
    */
   enterVR() {
+    this.emitEvent({
+      type: 'entervr',
+      timeStamp: Date.now(),
+      payload: {
+        stage: 'attempt',
+      },
+    });
     const display = this.vrState.getCurrentDisplay();
     if (!display || display.isPresenting) {
+      const error = display ? 'VR Display is already presenting.' : 'No VR Display is connected.';
+      this.emitEvent({
+        type: 'entervr',
+        timeStamp: Date.now(),
+        error: error,
+        payload: {
+          stage: 'failed',
+        },
+      });
       return;
     }
     display
@@ -536,17 +550,36 @@ export default class ReactInstance {
         },
       ])
       .then(() => {
+        this.emitEvent({
+          type: 'entervr',
+          timeStamp: Date.now(),
+          payload: {
+            stage: 'succeed',
+          },
+        });
         const leftParams = display.getEyeParameters('left');
         const rightParams = display.getEyeParameters('right');
         this.compositor.resize(
           leftParams.renderWidth + rightParams.renderWidth,
           Math.min(leftParams.renderHeight, rightParams.renderHeight),
-          1,
+          1
         );
+      })
+      .catch(() => {
+        this.emitEvent({
+          type: 'entervr',
+          timeStamp: Date.now(),
+          error: 'Failed request presenting in VR Display',
+          payload: {
+            stage: 'failed',
+          },
+        });
       });
   }
 
-  exitVR() {
+  _onExitVR() {
+    this.emitEvent({type: 'exitvr', timeStamp: Date.now()});
+    this._needsResize = true;
     const display = this.vrState.getCurrentDisplay();
     if (display && display.isPresenting) {
       display

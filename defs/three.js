@@ -121,6 +121,7 @@ declare module 'three' {
     constructor(number, number, number, ?string): this;
     copy(e: Euler): this;
     set(number, number, number, string): this;
+    setFromQuaternion(Quaternion, string): this;
   }
 
   declare class Face3 {
@@ -160,6 +161,7 @@ declare module 'three' {
     map: ?Texture;
     needsUpdate: boolean;
     opacity: number;
+    premultipliedAlpha: boolean;
     renderOrder: number;
     shading: number;
     transparent: boolean;
@@ -369,5 +371,13 @@ declare module 'three' {
   declare class AnimationMixer {
     constructor(Scene): this;
     clipAction(clip: any): any;
+  }
+
+  declare class EventDispatcher {
+    constructor(): this;
+    addEventListener(string, Object => void): void;
+    hasEventListener(string, Object => void): bool;
+    removeEventListener(string, Object => void): void;
+    dispatchEvent(Object): void;
   }
 }

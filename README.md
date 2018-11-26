@@ -1,3 +1,8 @@
+
+> 这是从 Facebook 官方 fork 的项目，但是由于一些需求的改动，项目的代码并不会完全一致，项目会定期从 Facebook 同步 master 源码，同时我们也会把认为合理的代码变更提给官方 PR, 但是我们 dev 分支会是 @veervr 项目使用的稳定代码；所有项目可以通过 github 的地址形式安装依赖。所有的 Feature/Bugfix 可以在 [这里](http://wiki.veervr.club:5303/display/TECH/React-360+Updates) 看到。
+
+
+
 # React 360 [![npm version](https://badge.fury.io/js/react-360.svg)](https://badge.fury.io/js/react-360) [![Circle CI](https://circleci.com/gh/facebook/react-360.svg?style=shield)](https://circleci.com/gh/facebook/react-360)
 
 React 360 is a framework for the creation of interactive 360 experiences that run in your web browser. It pairs modern APIs like WebGL and WebVR with the declarative power of React, producing applications that can be consumed through a variety of devices. Leveraging web technologies and the existing React ecosystem, React 360 aims to simplify the construction of cross-platform 360 experiences.

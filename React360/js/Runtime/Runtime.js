@@ -19,7 +19,8 @@ import { type InputEvent } from '../Controls/InputChannels/Types';
 import type Module from '../Modules/Module';
 import type { CustomView } from '../Modules/UIManager';
 import GuiSys from '../OVRUI/UIView/GuiSys';
-import { ReactNativeContext } from '../ReactNativeContext';
+import {ReactNativeContext} from '../ReactNativeContext';
+import {type TextImplementation} from 'webgl-ui';
 import ReactContext from './ReactContext';
 import SurfaceRuntime from './SurfaceRuntime';
 
@@ -41,15 +42,12 @@ export type RuntimeOptions = {
   customViews?: Array<CustomView>,
   executor?: ReactExecutor,
   nativeModules?: Array<Module | NativeModuleInitializer>,
+  textImplementation?: TextImplementation,
   useNewViews?: boolean,
 };
 
 const raycaster = new THREE.Raycaster();
-function intersectObject(
-  object: Object,
-  ray: THREE.Raycaster,
-  intersects: Array<Object>,
-) {
+function intersectObject(object: Object, ray: THREE.Raycaster, intersects: Array<Object>) {
   if (object.visible === false) {
     return;
   }
@@ -83,11 +81,7 @@ export default class Runtime {
   guiSys: GuiSys;
   surfaceRuntime: SurfaceRuntime;
 
-  constructor(
-    scene: THREE.Scene,
-    bundle: string,
-    options: RuntimeOptions = {},
-  ) {
+  constructor(scene: THREE.Scene, bundle: string, options: RuntimeOptions = {}) {
     this._rootLocations = [];
     this._rootSurfaces = {};
     this._scene = scene;
@@ -128,6 +122,7 @@ export default class Runtime {
     if (options.useNewViews) {
       this.context = new ReactContext(this.executor, {
         assetRoot: options.assetRoot,
+        textImplementation: options.textImplementation,
       });
       this.surfaceRuntime = new SurfaceRuntime(this.context);
     } else {
@@ -160,11 +155,7 @@ export default class Runtime {
     if (dest instanceof Surface) {
       const context = this.context;
       if (context instanceof ReactContext) {
-        const tag = this.surfaceRuntime.createRootView(
-          name,
-          initialProps,
-          dest.getScene(),
-        );
+        const tag = this.surfaceRuntime.createRootView(name, initialProps, dest.getScene());
         const uid = this._offscreenRenderUID++;
         this._rootSurfaces[String(uid)] = {
           scene: dest.getScene(),
@@ -178,14 +169,9 @@ export default class Runtime {
       this.guiSys.registerOffscreenRender(
         dest.getScene(),
         dest.getCamera(),
-        dest.getRenderTarget(),
+        dest.getRenderTarget()
       );
-      const tag = context.createRootView(
-        name,
-        initialProps,
-        dest.getScene(),
-        true,
-      );
+      const tag = context.createRootView(name, initialProps, dest.getScene(), true);
       return tag;
     } else if (dest instanceof Location) {
       const node = new THREE.Object3D();
@@ -235,12 +221,7 @@ export default class Runtime {
         const worldPosition = location.worldPosition;
         node.position.set(worldPosition[0], worldPosition[1], worldPosition[2]);
         const worldRotation = location.worldRotation;
-        node.quaternion.set(
-          worldRotation[0],
-          worldRotation[1],
-          worldRotation[2],
-          worldRotation[3],
-        );
+        node.quaternion.set(worldRotation[0], worldRotation[1], worldRotation[2], worldRotation[3]);
         location.clearDirtyFlag();
       }
     }
@@ -297,11 +278,7 @@ export default class Runtime {
         const x = hit.uv.x * scene._rttWidth;
         const y = (1 - hit.uv.y) * scene._rttHeight;
         if (surface && this.surfaceRuntime) {
-          const surfaceHit = this.surfaceRuntime.getHitTag(
-            surface.rootTag,
-            x,
-            y,
-          );
+          const surfaceHit = this.surfaceRuntime.getHitTag(surface.rootTag, x, y);
           this.setHitTarget(surfaceHit);
           return;
         }
@@ -343,11 +320,7 @@ export default class Runtime {
     } else {
       this.guiSys.updateLastHit(null, ray.type);
     }
-    this.guiSys.setCursorProperties(
-      ray.origin.slice(),
-      ray.direction.slice(),
-      ray.drawsCursor,
-    );
+    this.guiSys.setCursorProperties(ray.origin.slice(), ray.direction.slice(), ray.drawsCursor);
   }
 
   setHitTarget(tag: ?number) {
@@ -376,11 +349,7 @@ export default class Runtime {
       return;
     }
     const ray = rays[0];
-    const hit = this.surfaceRaycast(
-      surface.getScene(),
-      ray.origin[0],
-      ray.origin[1],
-    );
+    const hit = this.surfaceRaycast(surface.getScene(), ray.origin[0], ray.origin[1]);
     this.setIntersection(hit, ray, true);
   }
 

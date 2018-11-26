@@ -14,8 +14,10 @@ import {EnvironmentModule} from 'NativeModules';
 
 type Resource = string | {uri: string};
 
-export type EnvironmentImageOptions = {
+export type EnvironmentOptions = {
   format?: string,
+  transition?: number,
+  fadeLevel?: number,
 };
 
 export function clearBackground() {
@@ -31,10 +33,43 @@ export function setBackgroundImage(
     url: typeof url === 'object' ? url.uri : url,
     stereo: options.format,
   };
-  EnvironmentModule.loadScene(scene);
+  const transition: Object = {
+    transition: options.transition,
+    fadeLevel: options.fadeLevel,
+  }
+  EnvironmentModule.loadScene(scene, transition);
 }
 
-export function setBackgroundVideo(player: string) {
+export function setBackgroundVideo(player: string, options: EnvironmentOptions = {}) {
   const scene = {type: 'video', player};
-  EnvironmentModule.loadScene(scene);
+  const transition: Object = {
+    transition: options.transition,
+    fadeLevel: options.fadeLevel,
+  }
+  EnvironmentModule.loadScene(scene, transition);
+}
+
+export function preloadBackgroundImage(url: Resource) {
+  const scene: Object = {
+    type: 'photo',
+    url: typeof url === 'object' ? url.uri : url
+  };
+  EnvironmentModule.preloadScene(scene);
+}
+
+export function animateFade(fadeLevel: number, fadeTime: number) {
+  EnvironmentModule.animateFade(fadeLevel, fadeTime);
+}
+
+export function setScreen(screenId: string, handle: ?string, surfaceId: string, x: number, y: number, width: number, height: number) {
+  EnvironmentModule.setScreen({
+    screenId: screenId,
+    type: 'surface',
+    surface: surfaceId,
+    player: handle,
+    x: x,
+    y: y,
+    width: width,
+    height: height,
+  });
 }

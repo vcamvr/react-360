@@ -10,8 +10,11 @@
  */
 
 import * as THREE from 'three';
+import {type Quaternion} from '../Controls/Types';
 
 type ShapeType = 'Cylinder' | 'Flat';
+
+type SurfaceCenterControl = 'yaw' | 'yaw-pitch';
 
 export const SurfaceShape: {[key: ShapeType]: ShapeType} = {
   Cylinder: 'Cylinder',
@@ -60,11 +63,7 @@ export default class Surface {
   _renderTarget: THREE.WebGLRenderTarget;
   _subScene: THREE.Scene;
 
-  constructor(
-    width: number,
-    height: number,
-    shape: ShapeType = SurfaceShape.Cylinder,
-  ) {
+  constructor(width: number, height: number, shape: ShapeType = SurfaceShape.Cylinder) {
     this._width = width;
     this._height = height;
     this._density = DEFAULT_DENSITY;
@@ -159,6 +158,28 @@ export default class Surface {
   }
 
   /**
+   * Recenter a Flat panel, positioned on the outside of a sphere.
+   * Given the center control options:
+   *   1. 'yaw': The surface will fit the yaw angle with current camera orientaion
+   *   2. 'yaw-pitch': The surface will fit both the yaw and pitch angle
+   *       with the camera orientation.
+   */
+  recenter(cameraQuat: Quaternion, centerControl: SurfaceCenterControl) {
+    const euler = new THREE.Euler(0, 0, 0).setFromQuaternion(
+      new THREE.Quaternion(cameraQuat[0], cameraQuat[1], cameraQuat[2], cameraQuat[3]),
+      'YXZ'
+    );
+
+    if (centerControl === 'yaw') {
+      this._yaw = -euler.y;
+    } else {
+      this._yaw = -euler.y;
+      this._pitch = euler.x;
+    }
+    this._recomputeOrientation();
+  }
+
+  /**
    * Change the opacity of the surface and its contents
    */
   setOpacity(opacity: number) {
@@ -173,6 +194,14 @@ export default class Surface {
    */
   setVisibility(visible: boolean) {
     this._mesh.visible = visible;
+  }
+
+  attachSubNode(subNode: THREE.Object3D) {
+    this._subScene.add(subNode);
+  }
+
+  removeSubNode(subNode: THREE.Object3D) {
+    this._subScene.remove(subNode);
   }
 
   getWidth(): number {
@@ -233,14 +262,14 @@ export default class Surface {
         this._width,
         this._height,
         this._density,
-        this._radius,
+        this._radius
       );
     } else if (this._shape === SurfaceShape.Flat) {
       this._geometry = Surface.createFlatGeometry(
         this._width,
         this._height,
         this._density,
-        this._radius,
+        this._radius
       );
     }
     if (this._mesh) {
@@ -282,14 +311,9 @@ export default class Surface {
    * The geometry will only build the arc needed to create a surface of the
    * proper size.
    */
-  static createCylinderGeometry(
-    width: number,
-    height: number,
-    density: number,
-    radius: number,
-  ) {
-    const delta = 2 * Math.PI * width / density;
-    const halfHeight = radius * Math.PI * height / density;
+  static createCylinderGeometry(width: number, height: number, density: number, radius: number) {
+    const delta = (2 * Math.PI * width) / density;
+    const halfHeight = (radius * Math.PI * height) / density;
     return new THREE.CylinderGeometry(
       radius,
       radius,
@@ -298,7 +322,7 @@ export default class Surface {
       6,
       true,
       -delta * 0.5,
-      delta,
+      delta
     );
   }
 
@@ -306,14 +330,9 @@ export default class Surface {
    * Build a planar geometry for a given size, density, and distance from the
    * user.
    */
-  static createFlatGeometry(
-    width: number,
-    height: number,
-    density: number,
-    radius: number,
-  ) {
-    const halfWidth = radius * Math.PI * width / density;
-    const halfHeight = radius * Math.PI * height / density;
+  static createFlatGeometry(width: number, height: number, density: number, radius: number) {
+    const halfWidth = (radius * Math.PI * width) / density;
+    const halfHeight = (radius * Math.PI * height) / density;
     return new THREE.PlaneGeometry(halfWidth * 2, halfHeight * 2, 1, 1);
   }
 

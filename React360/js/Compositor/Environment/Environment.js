@@ -13,13 +13,17 @@ import * as THREE from 'three';
 import type ResourceManager from '../../Utils/ResourceManager';
 import type { VideoStereoFormat } from '../Video/Types';
 import type VideoPlayerManager from '../Video/VideoPlayerManager';
+import type SurfaceManager from '../SurfaceManager';
 import StereoBasicTextureMaterial from './StereoBasicTextureMaterial';
 import { HPanoBufferGeometry } from '../../Utils/HPano';
-import type { TextureMetadata } from './Types';
+import type {TextureMetadata} from './Types';
+import Fader from '../../Utils/Fader';
+import Screen from './Screen';
 
 export type PanoOptions = {
   format?: VideoStereoFormat,
   transition?: number,
+  fadeLevel?: number,
 };
 
 /**
@@ -52,13 +56,21 @@ export default class Environment {
   _panoMaterial: StereoBasicTextureMaterial;
   _panoMesh: THREE.Mesh;
   _panoSource: ?string;
-  _panoTransition: number;
+  _panoFade: Fader;
   _resourceManager: ?ResourceManager<Image>;
   _videoPlayers: ?VideoPlayerManager;
+  _surfaceManager: SurfaceManager;
+  _screens: {[id: string]: ?Screen};
 
-  constructor(rm: ?ResourceManager<Image>, videoPlayers: ?VideoPlayerManager, options: object) {
+  constructor(
+    rm: ?ResourceManager<Image>,
+    videoPlayers: ?VideoPlayerManager,
+    surfaceManager: SurfaceManager,
+    options: object
+  ) {
     this._resourceManager = rm;
     this._videoPlayers = videoPlayers;
+    this._surfaceManager = surfaceManager;
     this._options = options;
     // Objects for panorama management
 
@@ -94,7 +106,8 @@ export default class Environment {
     this._panoMesh.scale.set(-1, 1, 1);
     this._panoMesh.rotation.y = -Math.PI / 2;
     this._panoEyeOffsets = [[0, 0, 1, 1]];
-    this._panoTransition = 0;
+    this._panoFade = new Fader();
+    this._screens = {default: null};
   }
 
   _setPanoGeometryToSphere() {
@@ -143,6 +156,22 @@ export default class Environment {
         height: img.height,
       };
     });
+  }
+
+  // used for preloading image for future use
+  preloadImage(src: string) {
+    if (this._resourceManager) {
+      const resourceManager = this._resourceManager;
+      resourceManager.addReference(src);
+      resourceManager.getResourceForURL(src);
+    }
+  }
+
+  // release the reference for preloaded image
+  unloadImage(src: string) {
+    if (this._resourceManager) {
+      this._resourceManager.removeReference(src);
+    }
   }
 
   _updateTexture(data: TextureMetadata) {
@@ -207,22 +236,36 @@ export default class Environment {
     loader: ?Promise<TextureMetadata>,
     id: ?string,
     transitionTime: ?number,
+    targetFadeLevel: ?number
   ): Promise<void> {
-    const oldID = this._panoSource;
     this._panoSource = id;
     const duration = typeof transitionTime === 'number' ? transitionTime : 500;
-    const transition = duration ? 1 / duration : 1;
-    this._panoTransition = oldID ? -transition : 0;
+    const fadeLevel = typeof targetFadeLevel === 'number' ? targetFadeLevel : 1;
+    this._panoLoad = loader;
+    if (duration) {
+      this._panoFade.fadeImmediate({
+        targetLevel: 0,
+        duration: duration,
+        onFadeEnd: state => {
+          if (state !== 'finished' || !this._panoLoad) {
+            return;
+          }
+          this._panoLoad.then(data => {
+            this._panoFade.fadeImmediate({
+              targetLevel: fadeLevel,
+              duration: duration,
+            });
+            this._updateTexture(data);
+          });
+        },
+      });
+    }
     if (!loader) {
-      this._panoLoad = null;
       return Promise.resolve();
     }
-    this._panoLoad = loader;
     return loader.then(data => {
-      if (this._panoTransition === 0) {
+      if (!duration) {
         this._panoLoad = null;
-        // Fade transition completed
-        this._panoTransition = transition;
         return this._updateTexture(data);
       }
       // Fade is still in progress
@@ -253,17 +296,13 @@ export default class Environment {
       return Promise.resolve();
     }
     const loader = src ? this._loadImage(src, options) : null;
-    return this._setBackground(loader, src, options.transition);
+    return this._setBackground(loader, src, options.transition, options.fadeLevel);
   }
 
   setVideoSource(handle: string, options: PanoOptions = {}) {
-    const player = this._videoPlayers
-      ? this._videoPlayers.getPlayer(handle)
-      : null;
-    const loader = player
-      ? player.load().then(data => ({ ...data, src: handle }))
-      : null;
-    return this._setBackground(loader, handle, options.transition);
+    const player = this._videoPlayers ? this._videoPlayers.getPlayer(handle) : null;
+    const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
+    return this._setBackground(loader, handle, options.transition, options.fadeLevel);
   }
 
   prepareForRender(eye: ?string) {
@@ -272,34 +311,106 @@ export default class Environment {
     } else {
       this._panoMaterial.uniforms.stereoOffsetRepeat.value = this._panoEyeOffsets[0];
     }
+
+    for (const id in this._screens) {
+      const screen = this._screens[id];
+      if (screen) {
+        screen.prepareForRender(eye);
+      }
+    }
+  }
+
+  animateFade(fadeLevel: number, fadeTime: number) {
+    this._panoFade.queueFade({
+      targetLevel: fadeLevel,
+      duration: fadeTime,
+    });
+  }
+
+  setScreen(
+    screenId: string,
+    handle?: string,
+    surfaceId: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) {
+    if (this._screens[screenId] === undefined) {
+      throw new Error(`The scene doesn't include the screen ${screenId}!`);
+    } else if (!this._screens[screenId]) {
+      const screen = new Screen(surfaceId, x, y, width, height);
+      this._attachScreen(screen);
+      this._screens[screenId] = screen;
+    } else {
+      const screen = this._screens[screenId];
+      const previousScreen = screen.getSurfaceID();
+      if (previousScreen !== surfaceId) {
+        this._removeScreen(screen);
+      }
+      screen.update(surfaceId, x, y, width, height);
+      if (previousScreen !== surfaceId) {
+        this._attachScreen(screen);
+      }
+    }
+
+    if (this._screens[screenId]) {
+      const screen = this._screens[screenId];
+      if (handle) {
+        const player = this._videoPlayers ? this._videoPlayers.getPlayer(handle) : null;
+        const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
+        screen.setTexture(loader, handle);
+      } else {
+        screen.setTexture(null, handle);
+      }
+    }
+  }
+
+  _attachScreen(screen: Screen) {
+    const surface = this._surfaceManager.getSurface(screen.getSurfaceID());
+    if (surface) {
+      surface.attachSubNode(screen.getNode());
+    }
+  }
+
+  _removeScreen(screen: Screen) {
+    const surface = this._surfaceManager.getSurface(screen.getSurfaceID());
+    if (surface) {
+      surface.removeSubNode(screen.getNode());
+    }
+  }
+
+  updateScreenIds(screenIds: Array<string>) {
+    const newIdsDict = {};
+    for (const newId of screenIds) {
+      newIdsDict[newId] = true;
+      if (this._screens[newId] === undefined) {
+        this._screens[newId] = null;
+      }
+    }
+    for (const oldId in this._screens) {
+      if (!newIdsDict[oldId]) {
+        if (this._screens[oldId] != null) {
+          this._removeScreen(this._screens[oldId]);
+        }
+        delete this._screens[oldId];
+      }
+    }
   }
 
   frame(delta: number, camera) {
     if (this._panoMesh.onUpdate && this._panoMesh.geometry.type === 'HPanoBufferGeometry') {
       this._panoMesh.onUpdate(camera);
     }
+
     const transition = this._panoTransition;
     if (transition === 0) {
       return;
     }
-    const step = transition * delta;
-    const color = this._panoMaterial.color;
-    const oldValue = color.r;
-    let newValue = oldValue + step;
-    if (newValue <= 0) {
-      this._panoTransition = 0;
-      newValue = 0;
-    }
-    if (newValue >= 1) {
-      this._panoTransition = 0;
-      newValue = 1;
-    }
-    color.setRGB(newValue, newValue, newValue);
-    if (transition < 0 && this._panoTransition === 0 && this._panoLoad) {
-      this._panoLoad.then(data => {
-        this._panoTransition = -transition;
-        this._updateTexture(data);
-      });
+
+    if (this._panoFade.fadeFrame(delta)) {
+      const level = this._panoFade.getCurrentLevel();
+      this._panoMaterial.color.setRGB(level, level, level);
     }
   }
 }
