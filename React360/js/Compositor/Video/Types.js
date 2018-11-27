@@ -74,14 +74,15 @@ export interface VideoPlayer {
   load(): Promise<TextureMetadata>;
   pause(): void;
   play(): void;
-  refreshTexture(): void;
+  frame(): void;
   seekTo(position: number): void;
   setMuted(muted: boolean): void;
-  setSource(url: string, format?: string): void;
+  setSource(url: string, ext?: object): void;
   setVolume(vol: number): void;
   addEventListener(event: string, listener: VideoEventListener): void;
   removeEventListener(event: string, listener: VideoEventListener): void;
 }
+
 export type VideoPlayerStatics = {
   getSupportedFormats(): Array<string>,
 };

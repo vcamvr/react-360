@@ -126,7 +126,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     }
   };
 
-  setSource(src: string, format?: string) {
+  setSource(src: string, ext?: object) {
     if (this._texture) {
       this._texture.dispose();
     }
@@ -153,7 +153,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
         this._texture = tex;
         this._updateStatus('ready');
         resolve({
-          format: format || '2D',
+          ...(ext ? {format: ext.format || '2D'} : {format: '2D'}),
           height,
           src,
           tex,
@@ -178,7 +178,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     return this._load || Promise.reject(new Error('No source set'));
   }
 
-  refreshTexture() {
+  frame() {
     if (this._texture && this._playing) {
       this._texture.needsUpdate = true;
     }

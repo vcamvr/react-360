@@ -11,38 +11,24 @@
 
 import * as THREE from 'three';
 import type ResourceManager from '../../Utils/ResourceManager';
-import type { VideoStereoFormat } from '../Video/Types';
+import type {VideoStereoFormat} from '../Video/Types';
 import type VideoPlayerManager from '../Video/VideoPlayerManager';
+import type PlayerManager from '../Video/PlayerManager';
 import type SurfaceManager from '../SurfaceManager';
 import StereoBasicTextureMaterial from './StereoBasicTextureMaterial';
-import { HPanoBufferGeometry } from '../../Utils/HPano';
+import {HPanoBufferGeometry} from '../../Utils/HPano';
 import type {TextureMetadata} from './Types';
 import Fader from '../../Utils/Fader';
 import Screen from './Screen';
+import PlayerManager from '../Video/PlayerManager';
+import PlainImagePlayer from '../Image/PlainImagePlayer';
+import {loadImage} from '../../Utils/util';
 
 export type PanoOptions = {
   format?: VideoStereoFormat,
   transition?: number,
   fadeLevel?: number,
 };
-
-/**
- * Promise-ify image loading, used as a backup when no TextureManager is used
- */
-function loadImage(src: string): Promise<Image> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    img.onload = function () {
-      resolve(img);
-    };
-    img.onerror = function (err: any) {
-      reject(err);
-    };
-
-    img.src = src;
-  });
-}
 
 /**
  * Stores the various pieces of global environment state, including cursor
@@ -52,6 +38,7 @@ export default class Environment {
   _panoEyeOffsets: Array<[number, number, number, number]>;
   _panoGeomHemisphere: THREE.Geometry;
   _panoGeomSphere: THREE.Geometry;
+  _panoGeomHCube: THREE.Geometry;
   _panoLoad: ?Promise<TextureMetadata>;
   _panoMaterial: StereoBasicTextureMaterial;
   _panoMesh: THREE.Mesh;
@@ -59,6 +46,7 @@ export default class Environment {
   _panoFade: Fader;
   _resourceManager: ?ResourceManager<Image>;
   _videoPlayers: ?VideoPlayerManager;
+  _imagePlayers: ?ImagePlayerManager;
   _surfaceManager: SurfaceManager;
   _screens: {[id: string]: ?Screen};
 
@@ -70,31 +58,22 @@ export default class Environment {
   ) {
     this._resourceManager = rm;
     this._videoPlayers = videoPlayers;
+    this._imagePlayers = new PlayerManager(() => new PlainImagePlayer());
     this._surfaceManager = surfaceManager;
     this._options = options;
     // Objects for panorama management
-    if (options.uv) {
 
+    this.globeOnUpdate = this.globeOnUpdate.bind(this);
+
+    this._panoGeomHCube = new HPanoBufferGeometry();
+    if (options.uv) {
       const {phiStart, phiLength, thetaStart, thetaLength} = options.uv;
 
-      this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16, 0,
-      phiLength);
-      this._panoGeomHemisphere = new THREE.SphereGeometry(
-        1000,
-        16,
-        16,
-        0,
-        phiLength
-      );
+      this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16, phiStart, phiLength);
+      this._panoGeomHemisphere = new THREE.SphereGeometry(1000, 16, 16, phiStart, phiLength);
     } else {
-      this._panoGeomHemisphere = new THREE.SphereGeometry(
-        1000,
-        16,
-        16,
-        0,
-        Math.PI,
-      );
       this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16);
+      this._panoGeomHemisphere = new THREE.SphereGeometry(1000, 16, 16, 0, Math.PI);
     }
     this._panoMaterial = new StereoBasicTextureMaterial({
       color: '#ffffff',
@@ -115,6 +94,8 @@ export default class Environment {
     this._panoMesh.rotation.y = -Math.PI / 2;
     this._panoMaterial.uniforms.arcOffset.value = 0;
     this._panoMaterial.uniforms.arcLengthReciprocal.value = 1 / Math.PI / 2;
+    this._panoMesh.material = this._panoMaterial;
+    this._panoMesh.onUpdate = null;
     this._panoMesh.needsUpdate = true;
   }
 
@@ -125,16 +106,18 @@ export default class Environment {
       this._panoMaterial.uniforms.arcOffset.value = Math.PI / 2;
       this._panoMaterial.uniforms.arcLengthReciprocal.value = 1 / Math.PI;
     }
+    this._panoMesh.material = this._panoMaterial;
+    this._panoMesh.onUpdate = null;
     this._panoMesh.needsUpdate = true;
   }
 
-  _setHPanoGeometryToSphere() {
-    this._panoEyeOffsets = [[0, 0, 1, 1]];
-    this._panoMesh.geometry = this._hpanoGeomSphere;
-    this._panoMesh.visible = true;
-    this._panoMesh.material = this._panoMesh.geometry.material;
+  _setPanoGeometryToHCube(data) {
+    this._panoGeomHCube.updateTexture(data);
+    this._panoMesh.geometry = this._panoGeomHCube;
+    this._panoMesh.scale.z = -1;
+    this._panoMesh.material = this._panoGeomHCube.getCurrentMaterials();
+    this._panoMesh.onUpdate = this.globeOnUpdate;
     this._panoMesh.needsUpdate = true;
-    this._panoMaterial.needsUpdate = true;
   }
 
   _loadImage(src: string, options: PanoOptions): Promise<TextureMetadata> {
@@ -180,6 +163,11 @@ export default class Environment {
       return;
     }
     this._panoMesh.visible = true;
+
+    if (data.tile) {
+      return this._setPanoGeometryToHCube(data);
+    }
+
     this._panoMaterial.map = data.tex;
     const width = data.width;
     const height = data.height;
@@ -204,7 +192,8 @@ export default class Environment {
         // 180 side-by-side 3D
         this._panoEyeOffsets = [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]];
         this._setPanoGeometryToHemisphere();
-      } if (data.format === '3DTB') {
+      }
+      if (data.format === '3DTB') {
         this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
         this._setPanoGeometryToSphere();
       } else {
@@ -221,7 +210,7 @@ export default class Environment {
         this._setPanoGeometryToSphere();
       } else if (data.format === '3DLR') {
         // 180 side-by-side 3D
-        this._panoEyeOffsets = [[0.5, 0, 0.5, 1],[0, 0, 0.5, 1]];
+        this._panoEyeOffsets = [[0.5, 0, 0.5, 1], [0, 0, 0.5, 1]];
         this._setPanoGeometryToHemisphere();
       }
     }
@@ -238,38 +227,44 @@ export default class Environment {
     transitionTime: ?number,
     targetFadeLevel: ?number
   ): Promise<void> {
+    this._panoLoad = loader;
     this._panoSource = id;
     const duration = typeof transitionTime === 'number' ? transitionTime : 500;
     const fadeLevel = typeof targetFadeLevel === 'number' ? targetFadeLevel : 1;
-    this._panoLoad = loader;
+
     if (duration) {
-      this._panoFade.fadeImmediate({
-        targetLevel: 0,
-        duration: duration,
-        onFadeEnd: state => {
-          if (state !== 'finished' || !this._panoLoad) {
-            return;
-          }
-          this._panoLoad.then(data => {
-            this._panoFade.fadeImmediate({
-              targetLevel: fadeLevel,
-              duration: duration,
+      return new Promise(resovle => {
+        this._panoFade.fadeImmediate({
+          targetLevel: 0,
+          duration: duration,
+          onFadeEnd: state => {
+            if (state !== 'finished' || !this._panoLoad) {
+              return resovle();
+            }
+            this._panoLoad.then(data => {
+              this._panoFade.fadeImmediate({
+                targetLevel: fadeLevel,
+                duration: duration,
+              });
+              this._updateTexture(data);
+              resovle(data);
             });
-            this._updateTexture(data);
-          });
-        },
+          },
+        });
       });
     }
+
     if (!loader) {
       return Promise.resolve();
     }
+
     return loader.then(data => {
       if (!duration) {
         this._panoLoad = null;
-        return this._updateTexture(data);
+        this._updateTexture(data);
       }
       // Fade is still in progress
-      return Promise.resolve();
+      return Promise.resolve(data);
     });
   }
 
@@ -286,31 +281,33 @@ export default class Environment {
     if (this._resourceManager && this._panoSource) {
       this._resourceManager.removeReference(this._panoSource);
     }
-    if (src && src.tile) {
-      // use tile renderer
-      this._panoMesh.geometry.dispose();
-      this._panoMesh.scale.z = -1;
-      this.maxDepth = src.maxDepth || 2;
-      this._hpanoGeomSphere = new HPanoBufferGeometry(1000, this.maxDepth, src.tile, options.events);
-      this._panoMesh.onUpdate = this.globeOnUpdate.bind(this);
-      this._setHPanoGeometryToSphere();
-      return Promise.resolve();
-    }
     const loader = src ? this._loadImage(src, options) : null;
     return this._setBackground(loader, src, options.transition, options.fadeLevel);
   }
 
-  setVideoSource(handle: string, options: PanoOptions = {}) {
+  setVeeRSource(src: null | string | object, options: PanoOptions = {}): Promise<void> {
+    // @TODO: going to be the only public API for setting src.
+  }
+
+  setPhotoSource(handle: string, options: PanoOptions = {}): Promise<void> {
+    const player = this._imagePlayers ? this._imagePlayers.getPlayer(handle) : null;
+    const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
+    return this._setBackground(loader, handle, options.transition, options.fadeLevel);
+  }
+
+  setVideoSource(handle: string, options: PanoOptions = {}): Promise<void> {
     const player = this._videoPlayers ? this._videoPlayers.getPlayer(handle) : null;
     const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
     return this._setBackground(loader, handle, options.transition, options.fadeLevel);
   }
 
   prepareForRender(eye: ?string) {
-    if (eye === 'right' && this._panoEyeOffsets[1]) {
-      this._panoMaterial.uniforms.stereoOffsetRepeat.value = this._panoEyeOffsets[1];
-    } else {
-      this._panoMaterial.uniforms.stereoOffsetRepeat.value = this._panoEyeOffsets[0];
+    if (!this._panoMesh.geometry.isHPanoBufferGeometry) {
+      if (eye === 'right' && this._panoEyeOffsets[1]) {
+        this._panoMaterial.uniforms.stereoOffsetRepeat.value = this._panoEyeOffsets[1];
+      } else {
+        this._panoMaterial.uniforms.stereoOffsetRepeat.value = this._panoEyeOffsets[0];
+      }
     }
 
     for (const id in this._screens) {
@@ -399,11 +396,7 @@ export default class Environment {
     }
   }
 
-  frame(delta: number, camera) {
-    if (this._panoMesh.onUpdate && this._panoMesh.geometry.type === 'HPanoBufferGeometry') {
-      this._panoMesh.onUpdate(camera);
-    }
-
+  frame(delta: number) {
     const transition = this._panoTransition;
     if (transition === 0) {
       return;

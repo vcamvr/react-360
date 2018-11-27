@@ -10,11 +10,11 @@
  */
 
 import * as THREE from 'three';
-import { type Quaternion, type Ray, type Vec3 } from '../Controls/Types';
+import {type Quaternion, type Ray, type Vec3} from '../Controls/Types';
 import createRemoteImageManager from '../Utils/createRemoteImageManager';
 import type ResourceManager from '../Utils/ResourceManager';
 import Cursor from './Cursor';
-import Environment, { type PanoOptions } from './Environment/Environment';
+import Environment, {type PanoOptions} from './Environment/Environment';
 import Surface from './Surface';
 import SurfaceManager from './SurfaceManager';
 import type {VideoPlayer} from './Video/Types';
@@ -145,11 +145,10 @@ export default class Compositor {
 
   resize(width: number, height: number, pixelRatio: number = 1) {
     if (window.devicePixelRatio) {
-      pixelRatio = window.devicePixelRatio
+      pixelRatio = window.devicePixelRatio;
     }
     this._renderer.setPixelRatio(pixelRatio);
     this._renderer.setSize(width, height, false);
-
   }
 
   resizeCanvas(width: number, height: number) {
@@ -157,7 +156,6 @@ export default class Compositor {
     this._camera.updateProjectionMatrix();
     this._renderer.setViewport(0, 0, width, height);
     this._renderer.setSize(width, height, true);
-
   }
 
   prepareForRender(eye: ?string) {
@@ -165,7 +163,11 @@ export default class Compositor {
   }
 
   frame(delta: number) {
-    this._environment.frame(delta, this._camera);
+    const panoNode = this._environment.getPanoNode();
+    if (panoNode.onUpdate) {
+      panoNode.onUpdate(this._camera);
+    }
+    this._environment.frame(delta);
     this._videoPlayers.frame();
   }
 
