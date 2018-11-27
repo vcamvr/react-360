@@ -3,11 +3,7 @@
 
   "parser": "babel-eslint",
 
-  "plugins": [
-    "flowtype",
-    "prettier",
-    "react"
-  ],
+  "plugins": ["flowtype", "prettier", "react"],
 
   "env": {
     "browser": true,
@@ -16,13 +12,7 @@
     "node": true
   },
 
-  "extends": [
-    "prettier"
-  ],
-
-  "plugins": [
-    "prettier"
-  ],
+  "extends": ["prettier"],
 
   "globals": {
     "$Keys": false,
@@ -117,17 +107,17 @@
     "no-undef": 2,
     "no-undefined": 0,
     "no-undef-init": 1,
-    "no-unused-vars": [1, {"vars": "all", "args": "none"}],
+    "no-unused-vars": [1, { "vars": "all", "args": "none" }],
     "no-use-before-define": 0,
 
     "accessor-pairs": "off",
-    "key-spacing": ["warn", {"beforeColon": false, "afterColon": true}],
-    "max-len": ["warn", {"code": 120, "ignoreComments": true}],
+    "key-spacing": ["warn", { "beforeColon": false, "afterColon": true }],
+    "max-len": ["warn", { "code": 120, "ignoreComments": true }],
     "no-bitwise": "off",
     "no-tabs": "warn",
     "no-var": "warn",
     "object-curly-spacing": ["warn", "never"],
-    "prefer-const": ["warn", {"destructuring": "all"}],
+    "prefer-const": ["warn", { "destructuring": "all" }],
     "space-in-parens": "warn",
 
     "keyword-spacing": 1,

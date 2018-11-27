@@ -11,6 +11,7 @@
 
 import { type Quaternion } from '../Controls/Types';
 import { createCompassGlyph, createViewInVrGlyph } from './Glyphs';
+import { isMobileBrowser } from '../Utils/util';
 
 type Handler = () => mixed;
 
@@ -97,7 +98,7 @@ export default class Overlay implements OverlayInterface {
   _vrButtonText: Text;
   _wrapper: HTMLElement;
 
-  constructor(frame: HTMLElement) {
+  constructor(frame: HTMLElement, resetAngles: Handler) {
     this._wrapper = document.createElement('div');
     setStyles(this._wrapper, WRAPPER_STYLES);
     frame.appendChild(this._wrapper);
@@ -126,10 +127,12 @@ export default class Overlay implements OverlayInterface {
     });
     this._vrButton.style.display = 'none';
     this._wrapper.appendChild(this._vrButton);
-
     const compassWrapper = document.createElement('div');
     setStyles(compassWrapper, COMPASS_WRAPPER_STYLES);
     this._compass = createCompassGlyph(30, 30, '#ffffff');
+    this._compass.addEventListener('click', () => {
+      resetAngles();
+    });
     setStyles(this._compass, COMPASS_STYLES);
     compassWrapper.appendChild(this._compass);
     this._wrapper.appendChild(compassWrapper);
@@ -152,7 +155,7 @@ export default class Overlay implements OverlayInterface {
   }
 
   setVRButtonState(visible: boolean, text: string, handler: ?Handler) {
-    if (visible) {
+    if (visible && !isMobileBrowser()) {
       this.enableVRButton();
     } else {
       this.disableVRButton();

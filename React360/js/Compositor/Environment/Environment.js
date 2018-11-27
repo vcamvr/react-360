@@ -73,10 +73,10 @@ export default class Environment {
     this._surfaceManager = surfaceManager;
     this._options = options;
     // Objects for panorama management
-
     if (options.uv) {
+
       const {phiStart, phiLength, thetaStart, thetaLength} = options.uv;
-      // console.log()
+
       this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16, 0,
       phiLength);
       this._panoGeomHemisphere = new THREE.SphereGeometry(
@@ -289,8 +289,9 @@ export default class Environment {
     if (src && src.tile) {
       // use tile renderer
       this._panoMesh.geometry.dispose();
+      this._panoMesh.scale.z = -1;
       this.maxDepth = src.maxDepth || 2;
-      this._hpanoGeomSphere = new HPanoBufferGeometry(1000, this.maxDepth, src.tile);
+      this._hpanoGeomSphere = new HPanoBufferGeometry(1000, this.maxDepth, src.tile, options.events);
       this._panoMesh.onUpdate = this.globeOnUpdate.bind(this);
       this._setHPanoGeometryToSphere();
       return Promise.resolve();

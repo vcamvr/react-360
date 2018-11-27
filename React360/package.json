@@ -18,6 +18,7 @@
   ],
   "dependencies": {
     "eventemitter3": "3.1.0",
+    "ismobilejs": "^0.5.1",
     "three-gltf2-loader": "~1.2.0"
   }
 }
