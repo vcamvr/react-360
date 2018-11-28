@@ -9,7 +9,7 @@
  * @flow
  */
 
-import type {TextureMetadata} from '../Environment/Types';
+import type {TextureMetadata, SphereMetadata} from '../Environment/Types';
 
 export type VideoPlayerStatus =
   | 'closed' // No session.
@@ -51,6 +51,18 @@ export type VideoOptions = VideoPlayOptions & {
   autoPlay?: boolean,
 };
 
+export type PanoType = 'IMAGE' | 'VIDEO';
+
+export type PanoOptions = {
+  type: PanoType,
+  tile?: boolean,
+  maxLevel?: number,
+  format?: VideoStereoFormat,
+  uv?: SphereMetadata,
+  transition?: number,
+  fadeLevel?: number,
+};
+
 export type VideoEvent = {
   player: string,
 };
@@ -77,7 +89,7 @@ export interface VideoPlayer {
   frame(): void;
   seekTo(position: number): void;
   setMuted(muted: boolean): void;
-  setSource(url: string, ext?: object): void;
+  setSource(url: string, options?: PanoOptions): void;
   setVolume(vol: number): void;
   addEventListener(event: string, listener: VideoEventListener): void;
   removeEventListener(event: string, listener: VideoEventListener): void;

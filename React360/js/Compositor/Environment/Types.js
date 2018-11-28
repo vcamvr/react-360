@@ -10,11 +10,18 @@
  */
 
 import * as THREE from 'three';
+import type {PanoOptions} from '../Video/Types';
 
-export type TextureMetadata = {
-  format: ?string,
+export type SphereMetadata = {
+  phiStart: number,
+  phiLength: number,
+  thetaStart: number,
+  thetaLength: number,
+};
+
+export type TextureMetadata = PanoOptions & {
+  width: number,
   height: number,
   src: string,
   tex: THREE.Texture,
-  width: number,
 };

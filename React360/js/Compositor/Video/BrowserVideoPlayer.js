@@ -12,7 +12,13 @@
 import * as THREE from 'three';
 
 import type {TextureMetadata} from '../Environment/Types';
-import type {VideoPlayer, VideoPlayerStatus, onVideoStatusChangedCallback} from './Types';
+import type {
+  PanoOptions,
+  VideoPlayer,
+  VideoPlayerStatus,
+  onVideoStatusChangedCallback,
+} from './Types';
+import {DEFAULT_FORMAT, DEFAULT_UV} from '../../Utils/util';
 
 const FORMATS = {
   ogg: 'video/ogg; codecs="theora, vorbis"',
@@ -126,7 +132,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     }
   };
 
-  setSource(src: string, ext?: object) {
+  setSource(url: string, options?: PanoOptions) {
     if (this._texture) {
       this._texture.dispose();
     }
@@ -153,11 +159,13 @@ export default class BrowserVideoPlayer implements VideoPlayer {
         this._texture = tex;
         this._updateStatus('ready');
         resolve({
-          ...(ext ? {format: ext.format || '2D'} : {format: '2D'}),
-          height,
           src,
           tex,
-          width,
+          width: img.width,
+          height: img.height,
+          format: DEFAULT_FORMAT,
+          uv: DEFAULT_UV,
+          ...options,
         });
       });
       this._element.addEventListener('error', () => {

@@ -11,7 +11,7 @@
 
 import * as THREE from 'three';
 import type ResourceManager from '../../Utils/ResourceManager';
-import type {VideoStereoFormat} from '../Video/Types';
+import type {VideoStereoFormat, PanoOptions} from '../Video/Types';
 import type VideoPlayerManager from '../Video/VideoPlayerManager';
 import type PlayerManager from '../Video/PlayerManager';
 import type SurfaceManager from '../SurfaceManager';
@@ -22,13 +22,7 @@ import Fader from '../../Utils/Fader';
 import Screen from './Screen';
 import PlayerManager from '../Video/PlayerManager';
 import PlainImagePlayer from '../Image/PlainImagePlayer';
-import {loadImage} from '../../Utils/util';
-
-export type PanoOptions = {
-  format?: VideoStereoFormat,
-  transition?: number,
-  fadeLevel?: number,
-};
+import {loadTexture} from '../../Utils/util';
 
 /**
  * Stores the various pieces of global environment state, including cursor
@@ -111,34 +105,13 @@ export default class Environment {
     this._panoMesh.needsUpdate = true;
   }
 
-  _setPanoGeometryToHCube(data) {
-    this._panoGeomHCube.updateTexture(data);
+  _setPanoGeometryToHCube(data: TextureMetadata) {
+    this._panoGeomHCube.updateMaxLevel(data.maxLevel);
     this._panoMesh.geometry = this._panoGeomHCube;
     this._panoMesh.scale.z = -1;
-    this._panoMesh.material = this._panoGeomHCube.getCurrentMaterials();
+    this._panoMesh.material = 
     this._panoMesh.onUpdate = this.globeOnUpdate;
     this._panoMesh.needsUpdate = true;
-  }
-
-  _loadImage(src: string, options: PanoOptions): Promise<TextureMetadata> {
-    if (this._resourceManager) {
-      this._resourceManager.addReference(src);
-    }
-    return (this._resourceManager
-      ? this._resourceManager.getResourceForURL(src)
-      : loadImage(src)
-    ).then(img => {
-      const tex = new THREE.Texture(img);
-      tex.minFilter = THREE.LinearFilter;
-      tex.needsUpdate = true;
-      return {
-        src,
-        tex,
-        format: options.format,
-        width: img.width,
-        height: img.height,
-      };
-    });
   }
 
   // used for preloading image for future use
@@ -263,34 +236,54 @@ export default class Environment {
         this._panoLoad = null;
         this._updateTexture(data);
       }
-      // Fade is still in progress
+      // «Fade is still in progress»
       return Promise.resolve(data);
     });
   }
 
-  globeOnUpdate(camera) {
-    const projScreenMatrix = new THREE.Matrix4();
-    const modelViewMatrix = new THREE.Matrix4();
-    modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, this._panoMesh.matrixWorld);
-    projScreenMatrix.multiplyMatrices(camera.projectionMatrix, modelViewMatrix);
-    this._panoMesh.geometry.update(projScreenMatrix);
-    this._panoMesh.material = this._panoMesh.geometry.material;
+  globeOnUpdate(camera: THREE.Camera) {
+    // const projScreenMatrix = new THREE.Matrix4();
+    // const modelViewMatrix = new THREE.Matrix4();
+    // modelViewMatrix.multiplyMatrices(camera.matrixWorldInverse, this._panoMesh.matrixWorld);
+    // projScreenMatrix.multiplyMatrices(camera.projectionMatrix, modelViewMatrix);
+    // this._panoMesh.geometry.update(projScreenMatrix);
   }
 
-  setSource(src: null | string | object, options: PanoOptions = {}): Promise<void> {
+  setSource(src: null | string, options: PanoOptions = {}): Promise<void> {
     if (this._resourceManager && this._panoSource) {
       this._resourceManager.removeReference(this._panoSource);
     }
-    const loader = src ? this._loadImage(src, options) : null;
+    const loader = src ? loadTexture(src, options) : null;
     return this._setBackground(loader, src, options.transition, options.fadeLevel);
   }
 
-  setVeeRSource(src: null | string | object, options: PanoOptions = {}): Promise<void> {
-    // @TODO: going to be the only public API for setting src.
-  }
+  setVeeRSource(src: null | string, options: PanoOptions = {}): Promise<void> {
+    if (this._panoSource) {
+      this._imagePlayers.destroyPlayer(this._panoSource);
+      this._videoPlayers.destroyPlayer(this._panoSource);
+    }
 
-  setPhotoSource(handle: string, options: PanoOptions = {}): Promise<void> {
-    const player = this._imagePlayers ? this._imagePlayers.getPlayer(handle) : null;
+    if (!src) {
+      return Promise.resolve();
+    }
+
+    let playerManager = null;
+    switch (options.type) {
+      case 'IMAGE':
+        playerManager = this._imagePlayers;
+        break;
+      case 'VIDEO':
+        playerManager = this._videoPlayers;
+        break;
+    }
+
+    if (!playerManager) {
+      return Promise.reject();
+    }
+
+    const handle = `handle:${src}`;
+    playerManager.createPlayer(handle).setSource(src, options);
+    const player = playerManager.getPlayer(handle);
     const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
     return this._setBackground(loader, handle, options.transition, options.fadeLevel);
   }
