@@ -67,11 +67,11 @@ function clipLinePlane(plane, p0, p1, uv0, uv1) {
  * returns true if any portion of the line would be outsize of the frustum by clipping
  * to the left, right, top and bottom planes
  */
-const clipLineToFrustum = (function () {
+const clipLineToFrustum = (function() {
   const p0 = new THREE.Vector4();
   const p1 = new THREE.Vector4();
 
-  return function (ctx, pnt0, pnt1, uv0, uv1, projectionMatrix) {
+  return function(ctx, pnt0, pnt1, uv0, uv1, projectionMatrix) {
     p0.fromArray([pnt0[0], pnt0[1], pnt0[2], 1]);
     p0.applyMatrix4(projectionMatrix);
     p1.fromArray([pnt1[0], pnt1[1], pnt1[2], 1]);
@@ -82,8 +82,8 @@ const clipLineToFrustum = (function () {
     clipped = clipped || clipLinePlane([0, 1, 1, 0], p0, p1, uv0, uv1);
     clipped = clipped || clipLinePlane([0, -1, 1, 0], p0, p1, uv0, uv1);
     if (!clipped) {
-      const px0 = [p0.x / p0.w * 512, p0.y / p0.w * 512];
-      const px1 = [p1.x / p1.w * 512, p1.y / p1.w * 512];
+      const px0 = [(p0.x / p0.w) * 512, (p0.y / p0.w) * 512];
+      const px1 = [(p1.x / p1.w) * 512, (p1.y / p1.w) * 512];
       const dpxX = px1[0] - px0[0];
       const dpxY = px1[1] - px0[1];
       const px = Math.sqrt(dpxX * dpxX + dpxY * dpxY);
@@ -107,22 +107,92 @@ function zeroPrepend(str) {
   return str;
 }
 
-// states of loading of the textures
-const HPANO_MAP_UNLOADED = 0;
-const HPANO_MAP_LOADING = 1;
-const HPANO_MAP_LOADED = 2;
+function addFaces(positions, uvs, indices, rad, maxLevel) {
+  const context = {
+    offsetPosition: 0,
+    offsetUV: 0,
+    offsetIndices: 0,
+  };
 
-export function HPanoBufferGeometry(rad, maxLevels, baseurl, events = {}) {
+  function addFace(tl, tr, bl, br, level) {
+    positions[ctx.offsetPosition + 0] = tl[0];
+    positions[ctx.offsetPosition + 1] = tl[1];
+    positions[ctx.offsetPosition + 2] = tl[2];
+
+    positions[ctx.offsetPosition + 3] = tr[0];
+    positions[ctx.offsetPosition + 4] = tr[1];
+    positions[ctx.offsetPosition + 5] = tr[2];
+
+    positions[ctx.offsetPosition + 6] = bl[0];
+    positions[ctx.offsetPosition + 7] = bl[1];
+    positions[ctx.offsetPosition + 8] = bl[2];
+
+    positions[ctx.offsetPosition + 9] = br[0];
+    positions[ctx.offsetPosition + 10] = br[1];
+    positions[ctx.offsetPosition + 11] = br[2];
+
+    uvs[ctx.offsetUV + 0] = 0;
+    uvs[ctx.offsetUV + 1] = 1;
+
+    uvs[ctx.offsetUV + 2] = 1;
+    uvs[ctx.offsetUV + 3] = 1;
+
+    uvs[ctx.offsetUV + 4] = 0;
+    uvs[ctx.offsetUV + 5] = 0;
+
+    uvs[ctx.offsetUV + 6] = 1;
+    uvs[ctx.offsetUV + 7] = 0;
+
+    const index = ctx.offsetPosition / 3;
+    indices[ctx.offsetIndices + 0] = index + 0;
+    indices[ctx.offsetIndices + 1] = index + 1;
+    indices[ctx.offsetIndices + 2] = index + 3;
+
+    indices[ctx.offsetIndices + 3] = index + 0;
+    indices[ctx.offsetIndices + 4] = index + 3;
+    indices[ctx.offsetIndices + 5] = index + 2;
+
+    ctx.offsetPosition += 12;
+    ctx.offsetUV += 8;
+    ctx.offsetIndices += 6;
+
+    if (level >= maxLevel) {
+      return;
+    }
+
+    const mid_tlbr = [(tl[0] + br[0]) / 2, (tl[1] + br[1]) / 2, (tl[2] + br[2]) / 2];
+    const mid_tltr = [(tl[0] + tr[0]) / 2, (tl[1] + tr[1]) / 2, (tl[2] + tr[2]) / 2];
+    const mid_blbr = [(bl[0] + br[0]) / 2, (bl[1] + br[1]) / 2, (bl[2] + br[2]) / 2];
+    const mid_tlbl = [(tl[0] + bl[0]) / 2, (tl[1] + bl[1]) / 2, (tl[2] + bl[2]) / 2];
+    const mid_trbr = [(tr[0] + br[0]) / 2, (tr[1] + br[1]) / 2, (tr[2] + br[2]) / 2];
+
+    addFace(tl, mid_tltr, mid_tlbl, mid_tlbr, level + 1);
+    addFace(mid_tltr, tr, mid_tlbr, mid_trbr, level + 1);
+    addFace(mid_tlbl, mid_tlbr, bl, mid_blbr, level + 1);
+    addFace(mid_tlbr, mid_trbr, mid_blbr, br, level + 1);
+  }
+
+  addFace([-rad, rad, -rad], [rad, rad, -rad], [-rad, -rad, -rad], [rad, -rad, -rad], 0); // f
+  addFace([rad, rad, rad], [-rad, rad, rad], [rad, -rad, rad], [-rad, -rad, rad], 0); // b
+  addFace([rad, rad, -rad], [rad, rad, rad], [rad, -rad, -rad], [rad, -rad, rad], 0); // r
+  addFace([-rad, rad, rad], [-rad, rad, -rad], [-rad, -rad, rad], [-rad, -rad, -rad], 0); // l
+  addFace([-rad, -rad, -rad], [rad, -rad, -rad], [-rad, -rad, rad], [rad, -rad, rad], 0); // d
+  addFace([-rad, rad, rad], [rad, rad, rad], [-rad, rad, -rad], [rad, rad, -rad], 0); // u
+}
+
+function HPanoBufferGeometry(rad) {
   THREE.BufferGeometry.call(this);
   this.dirty = true;
   this.type = 'HPanoBufferGeometry';
-  this.material = [];
-  this.materialsCached = {};
+  this.maxLevel = 0;
   this.rad = rad;
-  this.baseurl = baseurl;
-  this.events = events;
-  this.maxLevels = maxLevels;
-  this.update();
+  if (this.boundingSphere === null) {
+    this.boundingSphere = new THREE.Sphere(undefined, Math.sqrt(3 * rad * rad));
+  }
+  this._material = [];
+  this._materialCached = {};
+  this._bits = [];
+  this.updateMaxLevel(2);
 }
 
 HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry.prototype), {
@@ -130,50 +200,76 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
 
   isHPanoBufferGeometry: true,
 
-  dispose: function () {
+  dispose: function() {
     THREE.BufferGeometry.prototype.dispose();
-    for (const i in this.material) {
-      if (i === 'isMultiMaterial') {
-        return;
-      }
-      this.material[i].map && this.material[i].map.dispose();
-      this.material[i].map = null;
-      this.material[i].dispose();
-    }
-    this.material = [];
-    this.materialsCached = {};
   },
 
-  update: function (projectionMatrix) {
-    this.dirty = false;
-    if (this.boundingSphere === null) {
-      this.boundingSphere = new THREE.Sphere();
+  _load: function(url) {
+    return ['f', 'b', 'r', 'l', 'd', 'u'].map((side, idx) => {
+      const file = url
+        .replace('%l', '1')
+        .replace('%s', side)
+        .replace('_%h', '')
+        .replace('_%v', '');
+
+      const mtr = new THREE.MeshBasicMaterial({
+        wireframe: false,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      });
+
+      mtr.index = idx;
+      this._materialCached[file] = mtr;
+    });
+  },
+
+  updateMaxLevel: function(maxLevel) {
+    if (this.maxLevel >= maxLevel) {
+      return;
     }
-    this.boundingSphere.radius = Math.sqrt(3 * this.rad * this.rad);
-    const quadCount = Math.pow(4, this.maxLevels) * 6;
+
+    const quadCount = Math.pow(4, maxLevel) * 6;
     const vertCount = quadCount * 4;
-    if (this.quadCount !== quadCount) {
-      this.quadCount = quadCount;
-      this.positions = new Float32Array(vertCount * 3);
-      this.uvs = new Float32Array(vertCount * 2);
-      this.indices = new Uint16Array(quadCount * 6);
-      this.setIndex(new THREE.BufferAttribute(this.indices, 1).setDynamic(true));
-      this.addAttribute('position', new THREE.BufferAttribute(this.positions, 3).setDynamic(true));
-      this.addAttribute('uv', new THREE.BufferAttribute(this.uvs, 2).setDynamic(true));
-    }
-    const positions = this.positions;
-    const uvs = this.uvs;
-    const indices = this.indices;
 
-    const context = {
-      offsetPosition: 0,
-      offsetUV: 0,
-      offsetIndices: 0,
-    };
+    const positions = new Float32Array(vertCount * 3);
+    const uvs = new Float32Array(vertCount * 2);
+    const indices = new Uint16Array(quadCount * 6);
 
-    for (const i in this.material) {
-      this.material[i].referenced = false;
+    addFaces(positions, uvs, indices, this.rad, maxLevel);
+
+    this.setIndex(new THREE.BufferAttribute(indices, 1));
+    this.addAttribute('position', new THREE.BufferAttribute(positions, 3));
+    this.addAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  },
+
+  updateTexture: function(texMetadata) {
+    const material = this._materialCached[texMetadata.file];
+    let idx = material.index;
+    this._bits[idx] = true;
+
+    let level = -1;
+    let fractal = 1;
+
+    while (idx >= 0) {
+      level++;
+      idx -= fractal * 6;
+      fractal *= 4;
     }
+
+    fractal /= 4;
+    const offset = idx + fractal * 6;
+    const side = Math.floor(offset / fractal);
+    const startIndices = offset - side * fractal - 3 * (1 - Math.pow(4, level));
+
+    this.addGroup(startIndices * 6, 6, this._material.length);
+  },
+
+  getCurrentMaterial: function() {
+    return this._material;
+  },
+
+  update: function(projectionMatrix) {
+    this.dirty = false;
 
     // at each update we will reset the groups
     this.clearGroups();
@@ -194,7 +290,7 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
           .replace('_%v', '');
       } else {
         file = geom.baseurl
-          .replace('%l', (level).toString())
+          .replace('%l', level.toString())
           .replace('%s', side)
           .replace('%h', (tile[0] + 1).toString())
           .replace('%v', (tile[1] + 1).toString());
@@ -212,7 +308,7 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
         // very basic test to see if edges clip frustum
         // and calculates a rough pixel per meter ratio
         // which is used to determine if it is worth dividing the tiles
-        const ctx = { texelPerPixel: 1 };
+        const ctx = {texelPerPixel: 1};
         let anyVisible = false;
         anyVisible |= !clipLineToFrustum(
           ctx,
@@ -269,7 +365,7 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
           const loader = new THREE.TextureLoader();
           loader.load(
             file,
-            function (texture) {
+            function(texture) {
               texture.wrapS = THREE.ClampToEdgeWrapping;
               texture.wrapT = THREE.ClampToEdgeWrapping;
               texture.minFilter = THREE.LinearFilter;
@@ -285,7 +381,7 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
               }
             },
             undefined,
-            function () {
+            function() {
               console.log('failed to load ' + file);
               if (typeof geom.events.onTileLoadError === 'function') {
                 geom.events.onTileLoadError(file, mtr);
@@ -480,3 +576,7 @@ HPanoBufferGeometry.prototype = Object.assign(Object.create(THREE.BufferGeometry
     }
   },
 });
+
+const HierarchicalCube = new HPanoBufferGeometry(1000);
+
+export default HierarchicalCube;

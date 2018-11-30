@@ -16,7 +16,7 @@ import type VideoPlayerManager from '../Video/VideoPlayerManager';
 import type PlayerManager from '../Video/PlayerManager';
 import type SurfaceManager from '../SurfaceManager';
 import StereoBasicTextureMaterial from './StereoBasicTextureMaterial';
-import {HPanoBufferGeometry} from '../../Utils/HPano';
+import HierarchicalCube from '../../Utils/HPano';
 import type {TextureMetadata} from './Types';
 import Fader from '../../Utils/Fader';
 import Screen from './Screen';
@@ -32,7 +32,7 @@ export default class Environment {
   _panoEyeOffsets: Array<[number, number, number, number]>;
   _panoGeomHemisphere: THREE.Geometry;
   _panoGeomSphere: THREE.Geometry;
-  _panoGeomHCube: THREE.Geometry;
+  _: THREE.Geometry;
   _panoLoad: ?Promise<TextureMetadata>;
   _panoMaterial: StereoBasicTextureMaterial;
   _panoMesh: THREE.Mesh;
@@ -59,7 +59,7 @@ export default class Environment {
 
     this.globeOnUpdate = this.globeOnUpdate.bind(this);
 
-    this._panoGeomHCube = new HPanoBufferGeometry();
+    this._panoGeomHCube = HierarchicalCube;
     if (options.uv) {
       const {phiStart, phiLength, thetaStart, thetaLength} = options.uv;
 
@@ -109,7 +109,7 @@ export default class Environment {
     this._panoGeomHCube.updateMaxLevel(data.maxLevel);
     this._panoMesh.geometry = this._panoGeomHCube;
     this._panoMesh.scale.z = -1;
-    this._panoMesh.material = 
+    this._panoMesh.material = this._panoGeomHCube.getCurrentMaterial();
     this._panoMesh.onUpdate = this.globeOnUpdate;
     this._panoMesh.needsUpdate = true;
   }
@@ -284,7 +284,9 @@ export default class Environment {
     const handle = `handle:${src}`;
     playerManager.createPlayer(handle).setSource(src, options);
     const player = playerManager.getPlayer(handle);
-    const loader = player ? player.load().then(data => ({...data, src: handle})) : null;
+    const loader = player
+      ? player.load().then(data => ({...data, file: data.src, src: handle}))
+      : null;
     return this._setBackground(loader, handle, options.transition, options.fadeLevel);
   }
 
