@@ -51,7 +51,7 @@ export type VideoOptions = VideoPlayOptions & {
   autoPlay?: boolean,
 };
 
-export type PanoType = 'IMAGE' | 'VIDEO';
+export type PanoType = 'photo' | 'video';
 
 export type PanoOptions = {
   type: PanoType,

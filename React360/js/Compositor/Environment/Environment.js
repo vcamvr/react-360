@@ -269,10 +269,10 @@ export default class Environment {
 
     let playerManager = null;
     switch (options.type) {
-      case 'IMAGE':
+      case 'photo':
         playerManager = this._imagePlayers;
         break;
-      case 'VIDEO':
+      case 'video':
         playerManager = this._videoPlayers;
         break;
     }

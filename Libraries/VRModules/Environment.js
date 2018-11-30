@@ -24,10 +24,7 @@ export function clearBackground() {
   EnvironmentModule.loadScene({type: 'black'});
 }
 
-export function setBackgroundImage(
-  url: Resource,
-  options: EnvironmentImageOptions = {},
-) {
+export function setBackgroundImage(url: Resource, options: EnvironmentImageOptions = {}) {
   const scene: Object = {
     type: 'photo',
     url: typeof url === 'object' ? url.uri : url,
@@ -36,7 +33,7 @@ export function setBackgroundImage(
   const transition: Object = {
     transition: options.transition,
     fadeLevel: options.fadeLevel,
-  }
+  };
   EnvironmentModule.loadScene(scene, transition);
 }
 
@@ -45,14 +42,14 @@ export function setBackgroundVideo(player: string, options: EnvironmentOptions =
   const transition: Object = {
     transition: options.transition,
     fadeLevel: options.fadeLevel,
-  }
+  };
   EnvironmentModule.loadScene(scene, transition);
 }
 
 export function preloadBackgroundImage(url: Resource) {
   const scene: Object = {
     type: 'photo',
-    url: typeof url === 'object' ? url.uri : url
+    url: typeof url === 'object' ? url.uri : url,
   };
   EnvironmentModule.preloadScene(scene);
 }
@@ -61,7 +58,15 @@ export function animateFade(fadeLevel: number, fadeTime: number) {
   EnvironmentModule.animateFade(fadeLevel, fadeTime);
 }
 
-export function setScreen(screenId: string, handle: ?string, surfaceId: string, x: number, y: number, width: number, height: number) {
+export function setScreen(
+  screenId: string,
+  handle: ?string,
+  surfaceId: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
   EnvironmentModule.setScreen({
     screenId: screenId,
     type: 'surface',
@@ -72,4 +77,16 @@ export function setScreen(screenId: string, handle: ?string, surfaceId: string, 
     width: width,
     height: height,
   });
+}
+
+export type VeeRSource = {
+  uri?: string,
+  format?: string,
+  uv?: object,
+  tile?: boolean,
+  maxLevel?: number,
+};
+
+export function setVeeRBackground(source: VeeRSource) {
+  EnvironmentModule.loadVeeRScene(source);
 }

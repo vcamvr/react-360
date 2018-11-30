@@ -10,6 +10,7 @@
  */
 
 import type Environment from '../Compositor/Environment/Environment';
+import type {SphereMetadata} from '../Compositor/Environment/Types';
 import type {VideoStereoFormat} from '../Compositor/Video/Types';
 import Module from './Module';
 
@@ -59,6 +60,14 @@ type SceneTransition = {
 
 type SceneDef = BlackSceneDef | PhotoSceneDef | VideoSceneDef;
 
+type VeeRSceneDef = {
+  type?: 'photo' | 'video',
+  uri?: string,
+  stereo?: VideoStereoFormat,
+  uv?: SphereMetadata,
+  tile?: boolean,
+  maxLevel?: number,
+};
 export default class EnvironmentModule extends Module {
   _env: Environment;
   _preloadedSrc: ?string;
@@ -81,7 +90,7 @@ export default class EnvironmentModule extends Module {
     }
     if (scene.type === 'photo') {
       this._env.setSource(scene.url, {
-        format: scene.stereo, 
+        format: scene.stereo,
         transition: transition.transition,
         fadeLevel: transition.fadeLevel,
       });
@@ -93,6 +102,18 @@ export default class EnvironmentModule extends Module {
         fadeLevel: transition.fadeLevel,
       });
     }
+  }
+
+  loadVeeRScene(scene: VeeRSceneDef, transition: SceneTransition = {}) {
+    this._env.setVeeRSource(scene.uri, {
+      type: scene.type,
+      format: scene.stereo,
+      uv: scene.uv,
+      tile: scene.tile,
+      maxLevel: scene.maxLevel,
+      transition: transition.transition,
+      fadeLevel: transition.fadeLevel,
+    });
   }
 
   preloadScene(scene: SceneDef) {
@@ -116,11 +137,19 @@ export default class EnvironmentModule extends Module {
       const surfaceScreen: SurfaceScreenDef = (screen: any);
       const id = surfaceScreen.id || 'default';
       const handle = surfaceScreen.player === undefined ? 'default' : surfaceScreen.player;
-      this._env.setScreen(id, handle, surfaceScreen.surface, surfaceScreen.x, surfaceScreen.y, surfaceScreen.width, surfaceScreen.height);
+      this._env.setScreen(
+        id,
+        handle,
+        surfaceScreen.surface,
+        surfaceScreen.x,
+        surfaceScreen.y,
+        surfaceScreen.width,
+        surfaceScreen.height
+      );
       return;
     }
   }
-  
+
   animateFade(fadeLevel: number, fadeTime: number) {
     this._env.animateFade(fadeLevel, fadeTime);
   }
