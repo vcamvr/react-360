@@ -108,7 +108,7 @@ function zeroPrepend(str) {
 }
 
 function addFaces(positions, uvs, indices, rad, maxLevel) {
-  const context = {
+  const ctx = {
     offsetPosition: 0,
     offsetUV: 0,
     offsetIndices: 0,

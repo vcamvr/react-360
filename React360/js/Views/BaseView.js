@@ -683,7 +683,9 @@ export default class RCTBaseView {
   }
 
   _flexDirection(value: any): void {
-    this.YGNode.setFlexDirection(value !== null ? MAP_CSS_FLEX_DIRECTION[value] : Flexbox.UNDEFINED);
+    this.YGNode.setFlexDirection(
+      value !== null ? MAP_CSS_FLEX_DIRECTION[value] : Flexbox.UNDEFINED
+    );
   }
 
   _flexWrap(value: any): void {
@@ -691,7 +693,9 @@ export default class RCTBaseView {
   }
 
   _justifyContent(value: any): void {
-    this.YGNode.setJustifyContent(value !== null ? MAP_CSS_JUSTIFY[value] : Flexbox.JUSTIFY_FLEX_START);
+    this.YGNode.setJustifyContent(
+      value !== null ? MAP_CSS_JUSTIFY[value] : Flexbox.JUSTIFY_FLEX_START
+    );
   }
 
   _overflow(value: any): void {

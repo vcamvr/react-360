@@ -78,15 +78,3 @@ export function setScreen(
     height: height,
   });
 }
-
-export type VeeRSource = {
-  uri?: string,
-  format?: string,
-  uv?: object,
-  tile?: boolean,
-  maxLevel?: number,
-};
-
-export function setVeeRBackground(source: VeeRSource) {
-  EnvironmentModule.loadVeeRScene(source);
-}

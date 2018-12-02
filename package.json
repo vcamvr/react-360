@@ -39,12 +39,13 @@
     "jest": "^17.0.3",
     "jsdom": "^9.10.0",
     "prettier": "^1.0.0",
-    "react": "16.3.2",
-    "react-native": "0.55.4",
     "rxjs": "^6.3.3",
     "three": "^0.87.0",
     "three-gltf2-loader": "~1.2.0",
-    "yoga-layout": "1.9.3"
+    "yoga-layout": "1.9.3",
+    "react": "~16.0.0",
+    "react-dev-utils": "^6.0.5",
+    "react-devtools": "^2.5.2"
   },
   "scripts": {
     "flow": "flow",

@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import isMobile from 'ismobilejs';
 import type ResourceManager from './ResourceManager';
 import type {TextureMetadata} from '../Compositor/Environment/Types';

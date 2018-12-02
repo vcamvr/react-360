@@ -9,6 +9,7 @@
  * @flow
  */
 
+import type {ReactNativeContext} from '../ReactNativeContext';
 import type Environment from '../Compositor/Environment/Environment';
 import type {SphereMetadata} from '../Compositor/Environment/Types';
 import type {VideoStereoFormat} from '../Compositor/Video/Types';
@@ -72,9 +73,10 @@ export default class EnvironmentModule extends Module {
   _env: Environment;
   _preloadedSrc: ?string;
 
-  constructor(env: Environment) {
+  constructor(ctx: ReactNativeContext, env: Environment) {
     super('EnvironmentModule');
 
+    this._rnctx = ctx;
     this._env = env;
     this._preloadedSrc = null;
   }
@@ -105,15 +107,19 @@ export default class EnvironmentModule extends Module {
   }
 
   loadVeeRScene(scene: VeeRSceneDef, transition: SceneTransition = {}) {
-    this._env.setVeeRSource(scene.uri, {
-      type: scene.type,
-      format: scene.stereo,
-      uv: scene.uv,
-      tile: scene.tile,
-      maxLevel: scene.maxLevel,
-      transition: transition.transition,
-      fadeLevel: transition.fadeLevel,
-    });
+    this._env
+      .setVeeRSource(scene.uri, {
+        type: scene.type,
+        format: scene.stereo,
+        uv: scene.uv,
+        tile: scene.tile,
+        maxLevel: scene.maxLevel,
+        transition: transition.transition,
+        fadeLevel: transition.fadeLevel,
+      })
+      .then(() => {
+        this._rnctx.callFunction('RCTDeviceEventEmitter', 'emit', ['onEnvLoaded', []]);
+      });
   }
 
   preloadScene(scene: SceneDef) {

@@ -13,7 +13,6 @@ import * as THREE from 'three';
 import type ResourceManager from '../../Utils/ResourceManager';
 import type {VideoStereoFormat, PanoOptions} from '../Video/Types';
 import type VideoPlayerManager from '../Video/VideoPlayerManager';
-import type PlayerManager from '../Video/PlayerManager';
 import type SurfaceManager from '../SurfaceManager';
 import StereoBasicTextureMaterial from './StereoBasicTextureMaterial';
 import HierarchicalCube from '../../Utils/HPano';

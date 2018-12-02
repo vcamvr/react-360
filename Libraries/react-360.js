@@ -130,6 +130,9 @@ const React360 = {
   get StyleSheet() {
     return require('StyleSheet');
   },
+  get UIManager() {
+    return require('UIManager');
+  },
 };
 
 module.exports = React360;

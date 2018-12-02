@@ -1,6 +1,6 @@
 export type ConstructPlayerMethod<T> = () => T;
 
-export interface PlayerManager<T> {
+export default class PlayerManager<T> {
   _constructPlayerMethod: ConstructPlayerMethod<T>;
   _players: {[handle: string]: VideoPlayer};
 

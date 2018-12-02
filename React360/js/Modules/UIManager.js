@@ -112,7 +112,7 @@ export default class UIManager extends Module {
     rnctx: ReactNativeContext,
     guiSys: GuiSys,
     customViews: Array<CustomView> = [],
-    flags: {[key: string]: boolean} = {},
+    flags: {[key: string]: boolean} = {}
   ) {
     super('UIManager');
     this._rnctx = rnctx;
@@ -161,8 +161,16 @@ export default class UIManager extends Module {
     this._viewDispatchers = {};
     this._layoutAnimation = null;
     if (flags.useNewViews) {
-      this.registerGLViewType('RCTView', (dispatch: Dispatcher) => ViewGL.registerBindings(dispatch), () => new ViewGL());
-      this.registerGLViewType('RCTImageView', (dispatch: Dispatcher) => ImageGL.registerBindings(dispatch), () => new ImageGL());
+      this.registerGLViewType(
+        'RCTView',
+        (dispatch: Dispatcher) => ViewGL.registerBindings(dispatch),
+        () => new ViewGL()
+      );
+      this.registerGLViewType(
+        'RCTImageView',
+        (dispatch: Dispatcher) => ImageGL.registerBindings(dispatch),
+        () => new ImageGL()
+      );
     } else {
       this.registerViewType('RCTView', RCTView.describe(), () => {
         return new RCTView(guiSys);
@@ -201,26 +209,18 @@ export default class UIManager extends Module {
     this.registerViewType('AmbientLight', RCTAmbientLight.describe(), () => {
       return new RCTAmbientLight(guiSys);
     });
-    this.registerViewType(
-      'DirectionalLight',
-      RCTDirectionalLight.describe(),
-      () => {
-        return new RCTDirectionalLight(guiSys);
-      },
-    );
+    this.registerViewType('DirectionalLight', RCTDirectionalLight.describe(), () => {
+      return new RCTDirectionalLight(guiSys);
+    });
     this.registerViewType('PointLight', RCTPointLight.describe(), () => {
       return new RCTPointLight(guiSys);
     });
     this.registerViewType('SpotLight', RCTSpotLight.describe(), () => {
       return new RCTSpotLight(guiSys);
     });
-    this.registerViewType(
-      'CylindricalPanel',
-      RCTCylindricalPanel.describe(),
-      () => {
-        return new RCTCylindricalPanel(guiSys);
-      },
-    );
+    this.registerViewType('CylindricalPanel', RCTCylindricalPanel.describe(), () => {
+      return new RCTCylindricalPanel(guiSys);
+    });
     this.registerViewType('QuadPanel', RCTQuadPanel.describe(), () => {
       return new RCTQuadPanel(guiSys);
     });
@@ -255,6 +255,8 @@ export default class UIManager extends Module {
    * @param attr - object containing attributes to set
    */
   createView(tag: number, type: string, rootTag: number, attr: Attributes) {
+    console.log('¢¢ createView', ...arguments);
+
     const rootView = this._rootViews[String(rootTag)];
     const inSurfaceContext = !!(rootView && rootView.inSurfaceContext);
     const newView = this._viewCreator[type]({inSurfaceContext});
@@ -318,7 +320,7 @@ export default class UIManager extends Module {
     moveTo: ?Array<number>,
     addChildTags: Array<number>,
     addAtIndices: Array<number>,
-    removeFrom: Array<number>,
+    removeFrom: Array<number>
   ) {
     const cssNodeToManage = this._views[String(tag)];
     if (!cssNodeToManage) {
@@ -414,18 +416,18 @@ export default class UIManager extends Module {
    * @param view - description of the view that includes the properties that it supports
    * @param viewCreator - function that returns a created view
    */
-  registerViewType(
-    name: string,
-    view: ViewDescription,
-    viewCreator: () => RCTBaseView,
-  ) {
+  registerViewType(name: string, view: ViewDescription, viewCreator: () => RCTBaseView) {
     // Flow doesn't like computed properties on classes
     (this: any)[name] = view;
     this._viewCreator[name] = viewCreator;
     this._viewsOfType[name] = {};
   }
 
-  registerGLViewType(name: string, registerBindings: Dispatcher => void, viewCreator: (...any) => ShadowViewWebGL<any>) {
+  registerGLViewType(
+    name: string,
+    registerBindings: Dispatcher => void,
+    viewCreator: (...any) => ShadowViewWebGL<any>
+  ) {
     const dispatch = {};
     registerBindings(dispatch);
     this._viewDispatchers[name] = dispatch;
@@ -520,10 +522,10 @@ export default class UIManager extends Module {
   createRootView(
     tag: number,
     container?: SceneGraphNode | THREE.Scene,
-    inSurfaceContext?: boolean,
+    inSurfaceContext?: boolean
   ) {
     // create a View with defaults
-    const view = this.createView(tag, 'RCTView', tag, {});
+    const view = this.createView(tag, 'RCTView', tag, {testID: 'rootView'});
     if (inSurfaceContext) {
       view.inSurfaceContext = true;
     }
@@ -580,7 +582,7 @@ export default class UIManager extends Module {
       null,
       [newReactTag],
       [indexOfView],
-      [indexOfView],
+      [indexOfView]
     );
   }
 
@@ -652,11 +654,7 @@ export default class UIManager extends Module {
       // Called recursively to layout subtrees of flexbox tree. Uses node.style.
       const rootView = this._rootViews[tag];
       // use css-layout flex box to apply new flow
-      rootView.YGNode.calculateLayout(
-        Flexbox.UNDEFINED,
-        Flexbox.UNDEFINED,
-        Flexbox.DIRECTION_LTR,
-      );
+      rootView.YGNode.calculateLayout(Flexbox.UNDEFINED, Flexbox.UNDEFINED, Flexbox.DIRECTION_LTR);
       // present the layout to the view implementations from root to child
       this.presentLayout(rootView);
     }
@@ -708,7 +706,7 @@ export default class UIManager extends Module {
     fontSize: number,
     width: number,
     maxLineCount: number,
-    callbackID: number,
+    callbackID: number
   ) {
     const wordWrapped = SDFFont.wrapLines(
       this._guiSys.font,
@@ -716,7 +714,7 @@ export default class UIManager extends Module {
       fontSize,
       width,
       undefined,
-      maxLineCount,
+      maxLineCount
     );
     const dim = SDFFont.measureText(this._guiSys.font, wordWrapped, fontSize);
     this._rnctx.invokeCallback(callbackID, [dim.maxHeight]);
@@ -751,9 +749,9 @@ export default class UIManager extends Module {
           bounds.max.z - bounds.min.z,
           1,
           1,
-          1,
+          1
         ),
-        new THREE.MeshBasicMaterial({wireframe: true, color: 0xe44dd9}),
+        new THREE.MeshBasicMaterial({wireframe: true, color: 0xe44dd9})
       );
       (boundViz: any).__REACT_VR_BOUNDING = true;
       uiView.add(boundViz);
@@ -781,11 +779,9 @@ export default class UIManager extends Module {
     const h = view.YGNode.getComputedHeight();
     while (view) {
       x +=
-        view.YGNode.getComputedLeft() -
-        view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
+        view.YGNode.getComputedLeft() - view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
       y +=
-        view.YGNode.getComputedTop() -
-        view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
+        view.YGNode.getComputedTop() - view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
       view = view.getParent();
     }
     // [x, y, w, h, left, top]
@@ -809,11 +805,9 @@ export default class UIManager extends Module {
     const h = view.YGNode.getComputedHeight();
     while (view) {
       x +=
-        view.YGNode.getComputedLeft() -
-        view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
+        view.YGNode.getComputedLeft() - view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
       y +=
-        view.YGNode.getComputedTop() -
-        view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
+        view.YGNode.getComputedTop() - view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
       view = view.getParent();
     }
     this._rnctx.invokeCallback(callback, [x, y, w, h]);
@@ -833,7 +827,7 @@ export default class UIManager extends Module {
     reactTag: number,
     ancestorTag: number,
     errorCallback: number,
-    successCallback: number,
+    successCallback: number
   ) {
     let view = this._views[String(reactTag)];
     if (!view) {
@@ -846,11 +840,9 @@ export default class UIManager extends Module {
     const h = view.YGNode.getComputedHeight();
     while (view && view.tag !== ancestorTag) {
       x +=
-        view.YGNode.getComputedLeft() -
-        view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
+        view.YGNode.getComputedLeft() - view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
       y +=
-        view.YGNode.getComputedTop() -
-        view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
+        view.YGNode.getComputedTop() - view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
       view = view.getParent();
     }
     this._rnctx.invokeCallback(successCallback, [x, y, w, h]);
@@ -863,22 +855,16 @@ export default class UIManager extends Module {
    * window which can cause unexpected results when measuring relative to things like ScrollViews
    * that can have offset content on the screen.
    */
-  measureLayoutRelativeToParent(
-    reactTag: number,
-    errorCallback: number,
-    successCallback: number,
-  ) {
+  measureLayoutRelativeToParent(reactTag: number, errorCallback: number, successCallback: number) {
     const view = this._views[String(reactTag)];
     if (!view) {
       this._rnctx.invokeCallback(successCallback, []);
       return;
     }
     const x =
-      view.YGNode.getComputedLeft() -
-      view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
+      view.YGNode.getComputedLeft() - view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
     const y =
-      view.YGNode.getComputedTop() -
-      view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
+      view.YGNode.getComputedTop() - view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
     const w = view.YGNode.getComputedWidth();
     const h = view.YGNode.getComputedHeight();
     this._rnctx.invokeCallback(successCallback, [x, y, w, h]);
@@ -906,15 +892,11 @@ export default class UIManager extends Module {
    * @param commandId - the command id for the native view to invoke different functions
    * @param commandArgs - the arguments of the command
    */
-  dispatchViewManagerCommand(
-    reactTag: number,
-    commandId: number,
-    commandArgs: Array<any>,
-  ) {
+  dispatchViewManagerCommand(reactTag: number, commandId: number, commandArgs: Array<any>) {
     const view = this._views[String(reactTag)];
     if (!view) {
       console.warn(
-        `UIManager.dispatchViewManagerCommand: dispatching command on a nonexistent view: ${reactTag}`,
+        `UIManager.dispatchViewManagerCommand: dispatching command on a nonexistent view: ${reactTag}`
       );
       return;
     }

@@ -191,7 +191,9 @@ export default class ReactInstance {
       customViews: options.customViews || [],
       executor: options.executor,
       nativeModules: [
-        new EnvironmentModule(this.compositor.getEnvironment()),
+        ctx => {
+          return new EnvironmentModule(ctx, this.compositor.getEnvironment());
+        },
         ctx => {
           const audio = new AudioModule(ctx);
           this._audioModule = audio;

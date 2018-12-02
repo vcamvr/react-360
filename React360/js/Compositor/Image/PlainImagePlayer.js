@@ -1,7 +1,7 @@
 import type {TextureMetadata} from '../Environment/Types';
 import type {VideoPlayer} from '../Video/Types';
 import {loadTexture} from '../../Utils/util';
-import {Observable} from 'rxjs/Observable';
+import {Observable} from 'rxjs';
 import HierarchicalCube from '../../Utils/HPano';
 
 export default class PlainImagePlayer implements VideoPlayer {

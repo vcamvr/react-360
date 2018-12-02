@@ -10,7 +10,7 @@
  */
 
 import BrowserVideoPlayer from './BrowserVideoPlayer';
-import type {PlayerManager} from './PlayerManager';
+import PlayerManager from './PlayerManager';
 import type {VideoPlayer} from './Types';
 
 /**
