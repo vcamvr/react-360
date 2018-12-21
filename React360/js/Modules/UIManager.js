@@ -255,8 +255,6 @@ export default class UIManager extends Module {
    * @param attr - object containing attributes to set
    */
   createView(tag: number, type: string, rootTag: number, attr: Attributes) {
-    console.log('¢¢ createView', ...arguments);
-
     const rootView = this._rootViews[String(rootTag)];
     const inSurfaceContext = !!(rootView && rootView.inSurfaceContext);
     const newView = this._viewCreator[type]({inSurfaceContext});
