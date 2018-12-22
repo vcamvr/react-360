@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import _ from 'lodash';
 import isMobile from 'ismobilejs';
 import type ResourceManager from './ResourceManager';
 import type {TextureMetadata} from '../Compositor/Environment/Types';
@@ -65,7 +66,7 @@ export function loadTexture(
       format: DEFAULT_FORMAT,
       uv: DEFAULT_UV,
       maxLevel: 2,
-      ...options,
+      ..._.omitBy(options, _.isNil),
     };
   });
 }
