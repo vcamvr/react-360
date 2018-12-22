@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import type {PanoOptions} from '../Video/Types';
+import type {VideoStereoFormat} from '../Video/Types';
 
 export type SphereMetadata = {
   phiStart: number,
@@ -19,9 +19,13 @@ export type SphereMetadata = {
   thetaLength: number,
 };
 
-export type TextureMetadata = PanoOptions & {
+export type TextureMetadata = {
   width: number,
   height: number,
   src: string,
   tex: THREE.Texture,
+  tile?: boolean,
+  maxLevel?: number,
+  format?: VideoStereoFormat,
+  uv?: SphereMetadata,
 };

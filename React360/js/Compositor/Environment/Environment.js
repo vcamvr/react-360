@@ -57,17 +57,9 @@ export default class Environment {
     // Objects for panorama management
 
     this.globeOnUpdate = this.globeOnUpdate.bind(this);
-
     this._panoGeomHCube = HierarchicalCube;
-    if (options.uv) {
-      const {phiStart, phiLength, thetaStart, thetaLength} = options.uv;
+    this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16, 0, 2 * Math.PI, 0, Math.PI);
 
-      this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16, phiStart, phiLength);
-      this._panoGeomHemisphere = new THREE.SphereGeometry(1000, 16, 16, phiStart, phiLength);
-    } else {
-      this._panoGeomSphere = new THREE.SphereGeometry(1000, 16, 16);
-      this._panoGeomHemisphere = new THREE.SphereGeometry(1000, 16, 16, 0, Math.PI);
-    }
     this._panoMaterial = new StereoBasicTextureMaterial({
       color: '#ffffff',
       side: THREE.DoubleSide,
@@ -82,11 +74,15 @@ export default class Environment {
     this._screens = {default: null};
   }
 
-  _setPanoGeometryToSphere() {
+  _setPanoGeometryToSphere(data) {
     this._panoMesh.geometry = this._panoGeomSphere;
-    this._panoMesh.rotation.y = -Math.PI / 2;
-    this._panoMaterial.uniforms.arcOffset.value = 0;
-    this._panoMaterial.uniforms.arcLengthReciprocal.value = 1 / Math.PI / 2;
+
+    const {phiStart, phiLength, thetaStart, thetaLength} = data.uv;
+    this._panoMaterial.uniforms.xArcOffset.value = phiStart;
+    this._panoMaterial.uniforms.xArcLengthReciprocal.value = 1 / phiLength;
+    this._panoMaterial.uniforms.yArcOffset.value = thetaStart;
+    this._panoMaterial.uniforms.yArcLengthReciprocal.value = 1 / thetaLength;
+
     this._panoMesh.material = this._panoMaterial;
     this._panoMesh.onUpdate = null;
     this._panoMesh.needsUpdate = true;
@@ -141,50 +137,18 @@ export default class Environment {
     }
 
     this._panoMaterial.map = data.tex;
-    const width = data.width;
-    const height = data.height;
-    if (width === height) {
-      // 1:1 ratio, 180 mono or top/bottom 360 3D
-      if (data.format === '3DTB') {
-        // 360 top-bottom 3D
-        this._panoEyeOffsets = [[0, 0, 1, 0.5], [0, 0.5, 1, 0.5]];
-        this._setPanoGeometryToSphere();
-      } else if (data.format === '3DBT') {
-        // 360 top-bottom 3D
-        this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
-        this._setPanoGeometryToSphere();
-      } else {
-        // assume 180 mono
-        this._panoEyeOffsets = [[0, 0, 1, 1]];
-        this._setPanoGeometryToHemisphere();
-      }
-    } else if (width / 2 === height) {
-      // 2:1 ratio, 360 mono or 180 3D
-      if (data.format === '3DLR') {
-        // 180 side-by-side 3D
-        this._panoEyeOffsets = [[0, 0, 0.5, 1], [0.5, 0, 0.5, 1]];
-        this._setPanoGeometryToHemisphere();
-      }
-      if (data.format === '3DTB') {
-        this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
-        this._setPanoGeometryToSphere();
-      } else {
-        // assume 360 mono
-        this._panoEyeOffsets = [[0, 0, 1, 1]];
-        this._setPanoGeometryToSphere();
-      }
-    } else {
-      if (data.format === '3DTB') {
-        this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
-        this._setPanoGeometryToSphere();
-      } else if (data.format === '3DBT') {
-        this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
-        this._setPanoGeometryToSphere();
-      } else if (data.format === '3DLR') {
-        // 180 side-by-side 3D
-        this._panoEyeOffsets = [[0.5, 0, 0.5, 1], [0, 0, 0.5, 1]];
-        this._setPanoGeometryToHemisphere();
-      }
+    if (data.format === '3DTB') {
+      this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
+      this._setPanoGeometryToSphere(data);
+    } else if (data.format === '3DBT') {
+      this._panoEyeOffsets = [[0, 0.5, 1, 0.5], [0, 0, 1, 0.5]];
+      this._setPanoGeometryToSphere(data);
+    } else if (data.format === '3DLR') {
+      this._panoEyeOffsets = [[0.5, 0, 0.5, 1], [0, 0, 0.5, 1]];
+      this._setPanoGeometryToSphere(data);
+    } else if (data.format === '2D') {
+      this._panoEyeOffsets = [[0, 0, 1, 1]];
+      this._setPanoGeometryToSphere(data);
     }
     this._panoMaterial.needsUpdate = true;
   }

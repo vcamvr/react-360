@@ -29,8 +29,10 @@ export default class StereoBasicTextureMaterial extends THREE.ShaderMaterial {
         useUV: { value: 1.0, type: 'f' }, // The opacity of material
         map: { value: null, type: 't' }, // The color map of material
         envMap: { value: null, type: 't' }, // The environment map of material
-        arcOffset: { value: 0, type: 'f' }, // Horizontal angle offset of the map
-        arcLengthReciprocal: { value: 1 / Math.PI / 2, type: 'f' }, // Horizontal arc length of the surface
+        xArcOffset: { value: 0, type: 'f' }, // Horizontal angle offset of the map
+        xArcLengthReciprocal: { value: 1 / Math.PI / 2, type: 'f' }, // Horizontal arc length of the surface
+        yArcOffset: { value: 0, type: 'f' }, // Verticle angle offset of the map
+        yArcLengthReciprocal: { value: 1 / Math.PI, type: 'f' }, // Verticle arc length of the surface
       },
     ]);
 

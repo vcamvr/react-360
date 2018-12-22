@@ -41,8 +41,10 @@ const StereoShaderLib = {
       uniform vec3 color;
       uniform float opacity;
       uniform float useUV;
-      uniform float arcOffset;
-      uniform float arcLengthReciprocal;
+      uniform float xArcOffset;
+      uniform float xArcLengthReciprocal;
+      uniform float yArcOffset;
+      uniform float yArcLengthReciprocal;
       #ifdef ENVMAP_TYPE_CUBE
       uniform samplerCube envMap;
       #else
@@ -62,8 +64,8 @@ const StereoShaderLib = {
           sampleUV = vUv;
         } else {
           vec3 nrm = normalize(vPosition);
-          sampleUV.y = asin(nrm.y) * RECIPROCAL_PI + 0.5;
-          sampleUV.x = (-atan( nrm.z, nrm.x ) + arcOffset) * arcLengthReciprocal + 0.5;
+          sampleUV.y = (asin(nrm.y) + yArcOffset) * yArcLengthReciprocal + 0.5;
+          sampleUV.x = (-atan( nrm.z, nrm.x ) + xArcOffset) * xArcLengthReciprocal + 0.5;
           sampleUV = sampleUV * stereoOffsetRepeat.zw + stereoOffsetRepeat.xy;
         }
         vec4 texColor = texture2D( map, sampleUV );
