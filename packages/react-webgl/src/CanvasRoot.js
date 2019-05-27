@@ -9,72 +9,112 @@
  * @flow
  */
 
-import * as THREE from 'three';
 import GLRoot from './GLRoot';
+import type {TextImplementation} from 'webgl-ui';
 
 export type CanvasRootOptions = {
   canvas?: HTMLCanvasElement,
+  text?: TextImplementation,
   height?: number,
   width?: number,
 };
 
 export default class CanvasRoot extends GLRoot {
   constructor(options: CanvasRootOptions = {}) {
-    super(new THREE.Scene());
+    const canvas = options.canvas || document.createElement('canvas');
+    canvas.style.backgroundColor = 'transparent';
+    const gl = canvas.getContext('webgl', {alpha: true, premultipliedAlpha: false});
+    super(gl, options.text);
+    this._canvas = canvas;
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
     const width = options.width || (options.canvas ? options.canvas.width : 300);
     const height = options.height || (options.canvas ? options.canvas.height : 300);
-
-    this._renderer = new THREE.WebGLRenderer({canvas: options.canvas});
-    this._camera = new THREE.OrthographicCamera();
     this.resize(width, height);
 
-    this._renderer.domElement.addEventListener('mousedown', this._onInput.bind(this, 'mousedown'));
-    this._renderer.domElement.addEventListener('mousemove', this._onMouseMove);
-    this._renderer.domElement.addEventListener('mouseleave', this._onMouseLeave);
+    canvas.addEventListener('click', this._onClick);
+    canvas.addEventListener('mousemove', this._onMouseMove);
+    canvas.addEventListener('mouseleave', this._onMouseLeave);
+    canvas.addEventListener('mousedown', this._onPressIn);
+    canvas.addEventListener('mouseup', this._onPressOut);
+    canvas.addEventListener('touchstart', this._onTouchStart);
+    canvas.addEventListener('touchend', this._onPressOut);
+    canvas.addEventListener('touchmove', this._onTouchMove);
   }
 
   resize(width: number, height: number) {
-    this._renderer.setSize(width, height, true);
-    this._renderer.setPixelRatio(window.devicePixelRatio || 1);
-    this._camera.left = 0;
-    this._camera.right = width;
-    this._camera.top = 0;
-    this._camera.bottom = height;
-    this._camera.near = -1000;
-    this._camera.far = 1000;
-    this._camera.setViewOffset(width, height, 0, 0, width, height);
-    this._camera.updateProjectionMatrix();
+    const pixelRatio = window.devicePixelRatio || 1;
+    this._canvas.width = width * pixelRatio;
+    this._canvas.height = height * pixelRatio;
+    this._canvas.style.width = width + 'px';
+    this._canvas.style.height = height + 'px';
+
+    this.getGLContext().viewport(0, 0, width * pixelRatio, height * pixelRatio);
+    this.getSurface().setViewport(width, height);
   }
 
-  getRenderer() {
-    return this._renderer;
+  getCanvas() {
+    return this._canvas;
   }
 
-  update() {
-    super.update();
-    this._renderer.render(this.getScene(), this._camera);
+  _setCursorFromTouch(e: TouchEvent, forceHitDetection?: boolean) {
+    if (!e.touches) {
+      return;
+    }
+    const touch = e.touches[0];
+    if (!touch) {
+      return;
+    }
+    let offsetTop = 0;
+    let offsetLeft = 0;
+    let offsetTarget = e.target;
+    while (offsetTarget != null) {
+      offsetTop += offsetTarget.offsetTop;
+      offsetLeft += offsetTarget.offsetLeft;
+      offsetTarget = offsetTarget.offsetTarget;
+    }
+    this.getSurface().setCursor(
+      touch.clientX - offsetLeft,
+      touch.clientY - offsetTop,
+      !!forceHitDetection
+    );
   }
 
-  showCursor() {
-    return true;
-  }
+  _onClick = () => {
+    this.getSurface().dispatchEvent('click');
+  };
 
-  updateCursor(cursor: string) {
-    this._renderer.domElement.style.cursor = cursor;
-  }
+  _onPressIn = () => {
+    this.getSurface().dispatchEvent('input', {
+      buttonClass: 'confirm',
+      action: 'down',
+    });
+  };
+
+  _onPressOut = () => {
+    this.getSurface().dispatchEvent('input', {
+      buttonClass: 'confirm',
+      action: 'up',
+    });
+  };
+
+  _onTouchStart = e => {
+    this._setCursorFromTouch(e, true);
+    this._onPressIn();
+    e.preventDefault();
+  };
+
+  _onTouchMove = e => {
+    this._setCursorFromTouch(e, false);
+  };
 
   _onMouseMove = e => {
-    this.setCursorCoordinates(e.offsetX, e.offsetY);
+    this.getSurface().setCursor(e.offsetX, e.offsetY);
   };
 
   _onMouseLeave = () => {
-    this.setCursorCoordinates(-9999, -9999);
+    this.getSurface().clearCursor();
   };
-
-  _onInput(event) {
-    for (const node of this.getCurrentHitSet()) {
-      node.fireEvent('onInput', {type: event});
-    }
-  }
 }

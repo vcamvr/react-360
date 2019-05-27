@@ -19,6 +19,7 @@ varying vec2 v_center;
 varying float v_edge;
 
 uniform mat4 u_transform;
+uniform mat4 projectionMatrix;
 
 #ifdef IMAGE
 attribute vec2 a_uv;
@@ -38,7 +39,7 @@ void main() {
 `;
 
 export const FRAG_SHADER = `
-precision mediump float;
+precision highp float;
 
 uniform float u_stroke;
 uniform vec4 u_bgcolor;
@@ -75,11 +76,13 @@ void main() {
   vec4 grad_color = mix(u_gradientstart, u_gradientend, grad_distance + 0.5);
   float alpha = clamp(sample.a + grad_color.a, 0., 1.);
   // Blend the gradient color into the underlying bg color or image
-  sample.rgb = mix(sample.rgb, grad_color.rgb, grad_color.a / alpha);
+  if (alpha > 0.0) {
+    sample.rgb = mix(sample.rgb, grad_color.rgb, grad_color.a / alpha);
+  }
   sample.a = alpha;
 
   vec4 color = mix(sample, u_bordercolor, clamp(dist + u_stroke, 0., 1.));
-  float opacity = clamp(0.6 - dist, 0., 1.);
-  gl_FragColor = vec4(color.rgb, color.a * opacity * u_opacity);
+  float opacity = clamp(0.6 - dist, 0., 1.) * color.a * u_opacity;
+  gl_FragColor = vec4(color.r * opacity, color.g * opacity, color.b * opacity, opacity);
 }
 `;

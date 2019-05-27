@@ -16,6 +16,7 @@ import Location from './Compositor/Location';
 import type Surface from './Compositor/Surface';
 import Overlay, {type OverlayInterface} from './Compositor/Overlay';
 import VRState from './Compositor/VRState';
+import type {VideoPlayerImplementation} from './Compositor/Video/Types';
 import MousePanCameraController from './Controls/CameraControllers/MousePanCameraController';
 import ScrollPanCameraController from './Controls/CameraControllers/ScrollPanCameraController';
 import DeviceOrientationCameraController from './Controls/CameraControllers/DeviceOrientationCameraController';
@@ -36,10 +37,8 @@ import VideoModule from './Modules/VideoModule';
 import type Module from './Modules/Module';
 import type {CustomView} from './Modules/UIManager';
 import Runtime, {type NativeModuleInitializer} from './Runtime/Runtime';
-import {Math as GLMath, type TextImplementation} from 'webgl-ui';
+import {rotateByQuaternion} from './Utils/Math';
 import EventEmitter from 'eventemitter3';
-
-const {rotateByQuaternion} = GLMath;
 
 type Root = {
   initialProps: Object,
@@ -65,14 +64,14 @@ type AppearanceState = {
 
 export type React360Options = {
   assetRoot?: string,
+  bridgeFile?: string,
   customOverlay?: OverlayInterface,
   customViews?: Array<CustomView>,
   executor?: ReactExecutor,
   frame?: number => mixed,
   fullScreen?: boolean,
   nativeModules?: Array<Module | NativeModuleInitializer>,
-  textImplementation?: TextImplementation,
-  useNewViews?: boolean,
+  customVideoPlayers?: Array<Class<VideoPlayerImplementation>>,
 };
 
 export type React360Event = {
@@ -106,6 +105,7 @@ export default class ReactInstance {
   _nextFrame: null | AnimationFrameData;
   _parent: HTMLElement;
   _rays: Array<Ray>;
+  _surfaceNameOffset: number = 0;
   _videoModule: ?VideoModule;
   controls: Controls;
   compositor: Compositor;
@@ -161,7 +161,7 @@ export default class ReactInstance {
     this.controls = new Controls();
     this.overlay = options.customOverlay || new Overlay(parent);
 
-    this.compositor = new Compositor(this._eventLayer, this.scene);
+    this.compositor = new Compositor(this._eventLayer, this.scene, options.customVideoPlayers);
     let assetRoot = options.assetRoot || 'static_assets/';
     if (!assetRoot.endsWith('/')) {
       assetRoot += '/';
@@ -169,6 +169,7 @@ export default class ReactInstance {
     this._assetRoot = assetRoot;
     const runtimeOptions = {
       assetRoot: assetRoot,
+      bridgeFile: options.bridgeFile,
       customViews: options.customViews || [],
       executor: options.executor,
       nativeModules: [
@@ -185,8 +186,6 @@ export default class ReactInstance {
         },
         ...(options.nativeModules || []),
       ],
-      textImplementation: options.textImplementation,
-      useNewViews: options.useNewViews,
     };
     this.runtime = new Runtime(this.scene, bundleFromLocation(bundle), runtimeOptions);
 
@@ -208,7 +207,7 @@ export default class ReactInstance {
     this.controls.addEventChannel(new TouchInputChannel(this._eventLayer));
     this.controls.addEventChannel(new KeyboardInputChannel());
     this.controls.addEventChannel(new GamepadInputChannel());
-    this.controls.addRaycaster(new ControllerRaycaster());
+    this.controls.addRaycaster(new ControllerRaycaster(this.scene));
     this.controls.addRaycaster(new MouseRaycaster(this._eventLayer));
     this.controls.addRaycaster(new TouchRaycaster(this._eventLayer));
   }
@@ -411,12 +410,26 @@ export default class ReactInstance {
    * of a Surface, returning the unique tag of the React root.
    * If the render loop hasn't started yet, this kicks it off.
    */
-  renderToSurface(root: Root, surface: Surface): number | null {
+  renderToSurface(root: Root, surface: Surface, surfaceName?: string): number | null {
     if (!this._looping) {
       this.start();
     }
+
+    const isDefaultSurface = surface === this.compositor.getDefaultSurface();
+    if (!isDefaultSurface && surfaceName === 'default') {
+      throw new Error('Only default surface can use "default" as surface name.');
+    }
+    const _surfaceName = surfaceName
+      ? surfaceName
+      : isDefaultSurface
+        ? 'default'
+        : `surface_${this._surfaceNameOffset++}`;
+    const tag = this.runtime.createRootView(root.name, root.initialProps, surface, _surfaceName);
     this.compositor.showSurface(surface);
-    return this.runtime.createRootView(root.name, root.initialProps, surface);
+    if (_surfaceName !== 'default') {
+      this.compositor.registerSurface(_surfaceName, surface);
+    }
+    return tag;
   }
 
   /**
@@ -428,6 +441,25 @@ export default class ReactInstance {
       this.start();
     }
     return this.runtime.createRootView(root.name, root.initialProps, location);
+  }
+
+  /**
+   * Detach a root view from the render root(Surface or Location).
+   * The tag here is the root view tag returned in `renderToSurface`
+   * or `renderToLocation`.
+   * You can also re-use the Surface/Location by calling `renderToSurface`
+   * or `renderToLocation` with another rootview name after the root view
+   * is detached
+   */
+  detachRoot(tag: number) {
+    const rootInfo = this.runtime.getSurfaceInfo(tag);
+    if (rootInfo) {
+      this.compositor.hideSurface(rootInfo.surface);
+      if (rootInfo.name !== 'default') {
+        this.compositor.unregisterSurface(rootInfo.name);
+      }
+    }
+    this.runtime.destroyRootView(tag);
   }
 
   /**

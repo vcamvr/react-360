@@ -116,6 +116,8 @@ export default class RCTBaseView {
   style: any;
   tag: number;
   rootTag: number;
+  isRoot: boolean;
+  surfaceName: ?string;
   interactableCount: number;
   inSurfaceContext: boolean;
   mouseInteractableCount: number;
@@ -143,6 +145,8 @@ export default class RCTBaseView {
     this.UIManager = null;
     this.tag = 0;
     this.rootTag = 0;
+    this.isRoot = false;
+    this.surfaceName = null;
     this.children = [];
     this.parent = null;
     this.props = {};
@@ -374,6 +378,13 @@ export default class RCTBaseView {
       view.isDirty = true;
       view = view.getParent();
     }
+  }
+
+  getViewRootID(): ?string {
+    if (!this.surfaceName && this.parent) {
+      this.surfaceName = this.parent.getViewRootID();
+    }
+    return this.surfaceName;
   }
 
   /**
@@ -926,6 +937,10 @@ export default class RCTBaseView {
       if (child.type !== 'UIView') {
         RCTBaseView.disposeThreeJSObject(node.children[i]);
       }
+    }
+    if (node.parent && node.parent.type !== 'UIView') {
+      // manually detached from non UIView parent
+      node.parent.remove(node);
     }
     node.parent = null;
     node.children = [];

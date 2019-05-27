@@ -34,8 +34,6 @@ import RCTCylindricalPanel from '../Views/CylindricalPanel';
 import RCTQuadPanel from '../Views/QuadPanel';
 import RCTPrefetch from '../Views/Prefetch';
 
-import {ViewGL, ImageGL, ShadowView, ShadowViewWebGL, type Dispatcher} from 'webgl-ui';
-
 import Module from './Module';
 import * as THREE from 'three';
 import * as SDFFont from '../OVRUI/SDFFont/SDFFont';
@@ -160,17 +158,12 @@ export default class UIManager extends Module {
     this._viewsOfType = {};
     this._viewDispatchers = {};
     this._layoutAnimation = null;
-    if (flags.useNewViews) {
-      this.registerGLViewType('RCTView', (dispatch: Dispatcher) => ViewGL.registerBindings(dispatch), () => new ViewGL());
-      this.registerGLViewType('RCTImageView', (dispatch: Dispatcher) => ImageGL.registerBindings(dispatch), () => new ImageGL());
-    } else {
-      this.registerViewType('RCTView', RCTView.describe(), () => {
-        return new RCTView(guiSys);
-      });
-      this.registerViewType('RCTImageView', RCTImage.describe(), () => {
-        return new RCTImage(guiSys, rnctx);
-      });
-    }
+    this.registerViewType('RCTView', RCTView.describe(), () => {
+      return new RCTView(guiSys);
+    });
+    this.registerViewType('RCTImageView', RCTImage.describe(), () => {
+      return new RCTImage(guiSys, rnctx);
+    });
     this.registerViewType('LiveEnvCamera', RCTLiveEnvCamera.describe(), () => {
       return new RCTLiveEnvCamera(guiSys);
     });
@@ -425,19 +418,6 @@ export default class UIManager extends Module {
     this._viewsOfType[name] = {};
   }
 
-  registerGLViewType(name: string, registerBindings: Dispatcher => void, viewCreator: (...any) => ShadowViewWebGL<any>) {
-    const dispatch = {};
-    registerBindings(dispatch);
-    this._viewDispatchers[name] = dispatch;
-    const NativeProps = {};
-    for (const key in dispatch) {
-      NativeProps[key] = true;
-    }
-    (this: any)[name] = {NativeProps};
-    this._viewCreator[name] = viewCreator;
-    this._viewsOfType[name] = {};
-  }
-
   /**
    * applies the attributes in the attr object to the view
    * @param tag - react tag id
@@ -446,46 +426,31 @@ export default class UIManager extends Module {
    */
   updateView(tag: number, type: string, attr: Attributes) {
     const view = this._views[String(tag)];
-    if (view instanceof ShadowView) {
-      const dispatchers = this._viewDispatchers[type];
-      for (const a in attr) {
-        const dispatcher = dispatchers[a];
-        if (dispatcher) {
-          dispatcher.call(view, attr[a]);
-        } else {
-          const styleSetter = (view: any)[`__setStyle_${a}`];
-          if (typeof styleSetter === 'function') {
-            styleSetter.call(view, attr[a]);
-          }
-        }
-      }
-    } else {
-      let forceLayout = false;
-      for (const a in attr) {
-        // use the declaration of the NativeProps to determine if this
-        // attribute is a style type or property
-        if ((this: any)[type] && (this: any)[type].NativeProps[a]) {
-          view.props[a] = attr[a];
-        } else {
+    let forceLayout = false;
+    for (const a in attr) {
+      // use the declaration of the NativeProps to determine if this
+      // attribute is a style type or property
+      if ((this: any)[type] && (this: any)[type].NativeProps[a]) {
+        view.props[a] = attr[a];
+      } else {
+        /* $FlowFixMe */
+        if (typeof view[`_${a}`] === 'function') {
           /* $FlowFixMe */
-          if (typeof view[`_${a}`] === 'function') {
-            /* $FlowFixMe */
-            view[`_${a}`](attr[a]);
-          } else {
-            view.style[a] = attr[a];
-          }
-          // check attribute is not in black list before forcing layout
-          forceLayout = forceLayout || !STYLES_THAT_DONT_ALTER_LAYOUT[a];
+          view[`_${a}`](attr[a]);
+        } else {
+          view.style[a] = attr[a];
         }
+        // check attribute is not in black list before forcing layout
+        forceLayout = forceLayout || !STYLES_THAT_DONT_ALTER_LAYOUT[a];
       }
-      // force a layout if any layout styles are applied
-      if (forceLayout) {
-        view.makeDirty();
-      }
-      // call update of view if required
-      if (typeof view.updateView === 'function') {
-        view.updateView();
-      }
+    }
+    // force a layout if any layout styles are applied
+    if (forceLayout) {
+      view.makeDirty();
+    }
+    // call update of view if required
+    if (typeof view.updateView === 'function') {
+      view.updateView();
     }
   }
 
@@ -527,12 +492,9 @@ export default class UIManager extends Module {
     if (inSurfaceContext) {
       view.inSurfaceContext = true;
     }
+    view.isRoot = true;
     this._rootViews[String(tag)] = view;
-    if (view instanceof ShadowViewWebGL) {
-      this._guiSys.add(view.view.getNode(), container);
-    } else {
-      this._guiSys.add(view.view, container);
-    }
+    this._guiSys.add(view.view, container);
   }
 
   /**
@@ -799,23 +761,17 @@ export default class UIManager extends Module {
    */
   measureInWindow(reactTag: number, callback: number) {
     let view = this._views[String(reactTag)];
-    if (!view) {
+    if (!view || !view.view) {
       this._rnctx.invokeCallback(callback, []);
       return;
     }
-    let x = 0;
-    let y = 0;
-    const w = view.YGNode.getComputedWidth();
-    const h = view.YGNode.getComputedHeight();
-    while (view) {
-      x +=
-        view.YGNode.getComputedLeft() -
-        view.YGNode.getComputedWidth() * view.style.layoutOrigin[0];
-      y +=
-        view.YGNode.getComputedTop() -
-        view.YGNode.getComputedHeight() * view.style.layoutOrigin[1];
-      view = view.getParent();
-    }
+    const uiView = view.view;
+    const bounds = new THREE.Box3();
+    bounds.setFromObject(uiView);
+    const x = bounds.min.x;
+    const y = bounds.min.y;
+    const w = bounds.max.x - bounds.min.x;
+    const h = bounds.max.y - bounds.min.y;
     this._rnctx.invokeCallback(callback, [x, y, w, h]);
   }
 
@@ -919,6 +875,33 @@ export default class UIManager extends Module {
       return;
     }
     view.receiveCommand(commandId, commandArgs);
+  }
+
+  /**
+   * Get the root id of a component, this can be used for video
+   * playing to know the attached surface
+   *
+   * @param reactTag - react tag id
+   */
+  $getViewRootID(reactTag: number, success: number, error: number) {
+    let view = this._views[String(reactTag)];
+    if (!view) {
+      this._rnctx.invokeCallback(error, [`Failed to get rootID, view doesn't exist.`]);
+      return;
+    }
+    const rootID = view.getViewRootID();
+    if (!rootID) {
+      this._rnctx.invokeCallback(error, [`Failed to get rootID.`]);
+      return;
+    }
+    this._rnctx.invokeCallback(success, [rootID]);
+  }
+
+  /**
+   * get a view from certain tag
+   */
+  getViewForTag(reactTag: number) {
+    return this._views[String(reactTag)];
   }
 
   // TODO:

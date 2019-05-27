@@ -17,6 +17,7 @@ import * as Flexbox from '../vendor/Yoga.bundle';
 import ShadowView, {type Dispatcher} from './ShadowView';
 import recursiveLayout from '../recursiveLayout';
 import colorStringToARGB from '../colorStringToARGB';
+import type {RenderGroup} from 'webgl-lite';
 
 type LayoutHook = (number, {height: number, width: number, x: number, y: number}) => mixed;
 
@@ -28,8 +29,7 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
   _borderBottomRightRadius: ?number;
   _borderBottomLeftRadius: ?number;
   _cursor: ?string;
-  _eventHandlers: {[event: string]: any};
-  _hasCursorEvent: boolean;
+  _gl: WebGLRenderingContext;
   _hasOnLayout: boolean;
   _layoutOrigin: [number, number];
   _onLayoutHook: ?LayoutHook;
@@ -37,38 +37,65 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
   _renderOrder: number;
   view: T;
 
-  constructor(viewCreator: () => T) {
+  constructor(gl: WebGLRenderingContext, viewCreator: any => T) {
     super();
 
+    this._gl = gl;
     this._borderRadiusDirty = false;
     this._cursor = null;
-    this._eventHandlers = {};
-    this._hasCursorEvent = false;
     this._hasOnLayout = false;
     this._layoutOrigin = [0, 0];
     this._zIndex = 0;
     this._renderOrder = 0;
-    this.view = viewCreator();
+    this.view = viewCreator(gl);
   }
 
   addChild(index: number, child: ShadowView) {
     super.addChild(index, child);
     if (child instanceof ShadowViewWebGL) {
-      this.view.getNode().add(child.view.getNode());
+      const node = this.view.getNode();
+      if (node.renderGroup) {
+        child.setRenderGroup(node.renderGroup);
+      }
       child.setParentTransform(this.view.getWorldTransform());
     } else {
-      this.view.getNode().add((child: any).view);
+      throw new Error('Cannot add unsupported child');
     }
   }
 
   removeChild(index: number) {
     const child = this.children[index];
     if (child instanceof ShadowViewWebGL) {
-      this.view.getNode().remove(child.view.getNode());
+      child.removeFromRenderGroup();
     } else {
-      this.view.getNode().remove((child: any).view);
+      throw new Error('Cannot remove unsupported child');
     }
     super.removeChild(index);
+  }
+
+  removeFromRenderGroup() {
+    const node = this.view.getNode();
+    if (node.renderGroup) {
+      node.renderGroup.removeNode(node);
+    }
+    for (const child of this.children) {
+      // $FlowFixMe
+      child.removeFromRenderGroup();
+    }
+  }
+
+  setRenderGroup(rg: RenderGroup) {
+    const node = this.view.getNode();
+    if (node.renderGroup !== rg) {
+      if (node.renderGroup) {
+        node.renderGroup.removeNode(node);
+      }
+      rg.addNode(node);
+      for (const child of this.children) {
+        // $FlowFixMe
+        child.setRenderGroup(rg);
+      }
+    }
   }
 
   getZIndex(): number {
@@ -80,6 +107,7 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
   }
 
   presentLayout() {
+    this.evaluateActiveTransitions();
     let childrenNeedUpdate = false;
     if (this.YGNode.getHasNewLayout()) {
       this.YGNode.setHasNewLayout(false);
@@ -112,10 +140,10 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
       childrenNeedUpdate = true;
     }
 
-    if (this._transformDirty) {
-      this.view.setLocalTransform(this._transform);
+    if (this.isTransformDirty()) {
+      this.view.setLocalTransform(this.getTransform());
       childrenNeedUpdate = true;
-      this._transformDirty = false;
+      this.setTransformDirty(false);
     }
 
     if (this._borderRadiusDirty) {
@@ -177,30 +205,11 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
 
   setParentTransform(transform: Transform) {
     this.view.setParentTransform(transform);
+    this.setTransformDirty(true);
   }
 
   getCursor(): ?string {
     return this._cursor;
-  }
-
-  hasCursorEvent(): boolean {
-    return this._hasCursorEvent;
-  }
-
-  setEventHandler(event: string, callback: any) {
-    if (!callback) {
-      delete this._eventHandlers[event];
-    } else {
-      this._eventHandlers[event] = callback;
-    }
-    this._hasCursorEvent = this._cursor != null || Object.keys(this._eventHandlers).length > 0;
-  }
-
-  fireEvent(event: string, payload?: any) {
-    const callback = this._eventHandlers[event];
-    if (callback) {
-      callback(payload);
-    }
   }
 
   containsPoint(x: number, y: number): boolean {
@@ -273,11 +282,6 @@ export default class ShadowViewWebGL<T: GLViewCompatible> extends ShadowView {
 
   __setStyle_cursor(cursor: ?string) {
     this._cursor = cursor;
-    if (cursor) {
-      this._hasCursorEvent = true;
-    } else {
-      this._hasCursorEvent = Object.keys(this._eventHandlers).length > 0;
-    }
   }
 
   __setStyle_gradientColorA(color: ?number | string) {

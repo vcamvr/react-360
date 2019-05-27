@@ -13,7 +13,11 @@ import Reconciler from 'react-reconciler';
 import * as HostConfig from './HostConfig';
 import GLRoot from './GLRoot';
 import CanvasRoot from './CanvasRoot';
+import Pressable from './Pressable.react';
+import {Image, Text, Quad, View} from './Primitives';
 import RenderTargetRoot from './RenderTargetRoot';
+import StyleSheet from './StyleSheet/StyleSheet';
+import Video from './Video.react';
 
 const Renderer = Reconciler(HostConfig);
 
@@ -26,14 +30,20 @@ export function render(element, container, callback) {
 
 Renderer.injectIntoDevTools({
   findFiberByHostInstance: Renderer.findHostInstance,
-  bundleType: __DEV__ ? 1 : 0,
-  version: '16.5.2',
+  bundleType: self.__DEV__ ? 1 : 0,
+  version: '16.8.6',
   rendererPackageName: 'react-webgl',
 });
 
-export const Image = 'image';
-export const Text = 'text';
-export const Quad = 'quad';
-export const View = 'quad';
-
-export {CanvasRoot, GLRoot, RenderTargetRoot};
+export {
+  CanvasRoot,
+  GLRoot,
+  RenderTargetRoot,
+  StyleSheet,
+  Image,
+  Text,
+  Quad,
+  Video,
+  View,
+  Pressable,
+};

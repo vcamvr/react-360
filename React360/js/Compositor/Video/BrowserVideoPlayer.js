@@ -12,7 +12,11 @@
 import * as THREE from 'three';
 
 import type {TextureMetadata} from '../Environment/Types';
-import type {VideoPlayer, VideoPlayerStatus, onVideoStatusChangedCallback} from './Types';
+import type {
+  VideoPlayerImplementation,
+  VideoPlayerStatus,
+  onVideoStatusChangedCallback,
+} from './Types';
 
 const FORMATS = {
   ogg: 'video/ogg; codecs="theora, vorbis"',
@@ -37,7 +41,7 @@ function fillSupportCache() {
  * Implements a video player interface using the browser's native video
  * playback abilities.
  */
-export default class BrowserVideoPlayer implements VideoPlayer {
+export default class BrowserVideoPlayer implements VideoPlayerImplementation {
   _element: HTMLVideoElement;
   _load: ?Promise<TextureMetadata>;
   _status: VideoPlayerStatus;
@@ -58,6 +62,11 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     // Prevents the default go to fullscreen behavior on iOS 10+
     this._element.setAttribute('playsinline', 'playsinline');
     this._element.setAttribute('webkit-playsinline', 'webkit-playsinline');
+    // Use dummy image for poster to prevent android webview poster image security issue
+    this._element.setAttribute(
+      'poster',
+      'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
+    );
     this._element.crossOrigin = 'anonymous';
     this._texture = null;
     if (document.body) {
@@ -72,6 +81,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     this._element.addEventListener('waiting', this._onWaiting);
     this._element.addEventListener('playing', this._onPlaying);
     this._element.addEventListener('timeupdate', this._onTimeupdate);
+    this._element.addEventListener('pause', this._onPause);
   }
 
   _updateStatus(newStatus: VideoPlayerStatus, error: ?string, forceReport: boolean = false) {
@@ -126,7 +136,14 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     }
   };
 
-  setSource(src: string, format?: string) {
+  _onPause = () => {
+    if (this._playing) {
+      this._playing = false;
+      this._updateStatus('paused');
+    }
+  };
+
+  setSource(src: string, stereoFormat: string, fileFormat: string, layout?: string) {
     if (this._texture) {
       this._texture.dispose();
     }
@@ -153,7 +170,8 @@ export default class BrowserVideoPlayer implements VideoPlayer {
         this._texture = tex;
         this._updateStatus('ready');
         resolve({
-          format: format || '2D',
+          format: stereoFormat || '2D',
+          layout: layout || 'RECT',
           height,
           src,
           tex,
@@ -178,7 +196,7 @@ export default class BrowserVideoPlayer implements VideoPlayer {
     return this._load || Promise.reject(new Error('No source set'));
   }
 
-  refreshTexture() {
+  update() {
     if (this._texture && this._playing) {
       this._texture.needsUpdate = true;
     }
@@ -197,9 +215,16 @@ export default class BrowserVideoPlayer implements VideoPlayer {
   }
 
   play() {
-    this._element.play();
-    this._playing = true;
-    this._updateStatus('playing');
+    this._element
+      .play()
+      .then(() => {
+        this._playing = true;
+        this._updateStatus('playing');
+      })
+      .catch((e: Error) => {
+        console.error(`BrowserVideoPlayer: get error "${e.toString()}" when calling play().`);
+        this._updateStatus(this._status, e.toString(), true);
+      });
   }
 
   pause() {

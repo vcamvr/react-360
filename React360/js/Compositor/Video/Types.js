@@ -23,7 +23,7 @@ export type VideoPlayerStatus =
   | 'stopped'; // Session is stopped (ready to play)
 
 export type VideoStereoFormat = '2D' | '3DLR' | '3DTB' | '3DBT' | 'UNKNOWN';
-export type VideoLayout = 'RECT' | 'SPHERICAL';
+export type VideoLayout = 'RECT' | 'SPHERICAL' | 'CUBEMAP_32';
 
 export type VideoRotation = {
   yaw: number,
@@ -68,16 +68,17 @@ export type VideoStatusEvent = VideoEvent & {
 export type onVideoStatusChangedCallback = (event: VideoStatusEvent) => void;
 export type VideoEventListener = onVideoStatusChangedCallback;
 
-export interface VideoPlayer {
+export interface VideoPlayerImplementation {
   constructor(src: string): void;
   destroy(): void;
   load(): Promise<TextureMetadata>;
   pause(): void;
   play(): void;
-  refreshTexture(): void;
+  update(): void;
   seekTo(position: number): void;
   setMuted(muted: boolean): void;
-  setSource(url: string, format?: string): void;
+  setLoop(loop: boolean): void;
+  setSource(url: string, stereoformat: string, fileFormat: string, layout?: string): void;
   setVolume(vol: number): void;
   addEventListener(event: string, listener: VideoEventListener): void;
   removeEventListener(event: string, listener: VideoEventListener): void;

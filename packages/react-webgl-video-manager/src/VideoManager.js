@@ -9,6 +9,7 @@
  * @flow
  */
 
+import getExtension from './getExtension';
 import VideoPlayer from './VideoPlayer';
 import type {VideoPlayerImplementation} from './VideoTypes';
 import {type TextureManager} from 'webgl-ui';
@@ -18,10 +19,12 @@ type VideoHandle = string;
 export default class VideoManager {
   _playerImplementations: Array<VideoPlayerImplementation>;
   _players: {[handle: string]: VideoPlayer};
+  _textureManager: TextureManager;
 
   constructor(textureManager: TextureManager) {
     this._players = {};
     this._playerImplementations = [];
+    this._textureManager = textureManager;
     // register video hook on texture manager
     textureManager.registerCustomProtocol('video', url => {
       const name = url.replace(/^video:\/\//, '');
@@ -29,7 +32,7 @@ export default class VideoManager {
       if (!player) {
         return null;
       }
-      return player.load().then(metadata => metadata.tex);
+      return player.getTexture();
     });
   }
 
@@ -59,17 +62,19 @@ export default class VideoManager {
     this._playerImplementations.push(impl);
   }
 
-  createPlayerImplementation(src: string) {
-    const ext = src.substr(src.lastIndexOf('.') + 1);
-    for (const Impl of this._playerImplementations) {
-      // $FlowFixMe - no support for statics
-      const supported = Impl.getSupportedFormats();
-      if (supported.indexOf(ext) > -1) {
-        // $FlowFixMe - can't instantiate an interface
-        return new Impl();
+  createPlayerImplementation(sources: Array<string>) {
+    for (const src of sources) {
+      const ext = getExtension(src);
+      for (const Impl of this._playerImplementations) {
+        // $FlowFixMe - no support for statics
+        const supported = Impl.getSupportedFormats();
+        if (supported.indexOf(ext) > -1) {
+          // $FlowFixMe - can't instantiate an interface
+          return new Impl(this._textureManager.getGLContext());
+        }
       }
     }
-    throw new Error(`No registered player supports ${ext} files.`);
+    throw new Error('No registered player supports any of these files.');
   }
 
   update() {

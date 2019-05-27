@@ -35,13 +35,11 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
   _cachedText: string;
   _geometryDirty: boolean;
   _text: FontGeometry;
-  _textColor: ?number;
   _textDirty: boolean;
 
-  constructor(impl: TextImplementation) {
-    super(() => new GLView());
+  constructor(gl: WebGLRenderingContext, impl: TextImplementation) {
+    super(gl, gl_ => new GLView(gl_));
     this.textChildren = [];
-    this._textColor = null;
     this._textDirty = true;
     this._geometryDirty = false;
     this._cachedText = '';
@@ -50,7 +48,6 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
       size: 20,
       align: 'auto',
     });
-    this.view.getNode().add(this._text.getNode());
     this.__setStyle_cursor('text');
 
     this.YGNode.setMeasureFunc((width, widthMeasureMode, height, heightMeasureMode) =>
@@ -69,13 +66,18 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
       offX, offY, 0, 1,
     ];
     matrixMultiply4(transform, this.view.getWorldTransform());
-    this._text.getNode().material.uniforms.u_transform.value.fromArray(transform);
+    this._text.getNode().setUniform('u_transform', transform);
   }
 
   __setStyle_color(color: number | string) {
     const colorNumber = typeof color === 'number' ? color : colorStringToARGB(color);
-    this._textColor = colorNumber;
-    this._textDirty = true;
+    this._text.setColor(colorNumber);
+  }
+
+  __setStyle_fontFamily(family: string) {
+    this._text.setFontFamily(family);
+    this.YGNode.markDirty();
+    this._geometryDirty = true;
   }
 
   __setStyle_fontSize(size: number) {
@@ -99,9 +101,38 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
     this._geometryDirty = true;
   }
 
+  __setStyle_lineHeight(height: number) {
+    if (height == null) {
+      height = Math.ceil(this._text.getSize() * 1.2);
+    }
+    this._text.setLineHeight(height);
+    this.YGNode.markDirty();
+    this._geometryDirty = true;
+  }
+
   __setStyle_textAlign(align: string) {
     this._text.setAlign(align);
     this._geometryDirty = true;
+  }
+
+  removeFromRenderGroup() {
+    super.removeFromRenderGroup();
+    if (this._text) {
+      const textNode = this._text.getNode();
+      if (textNode.renderGroup) {
+        textNode.renderGroup.removeNode(textNode);
+      }
+    }
+  }
+
+  setParent(parent: any) {
+    if (parent) {
+      const parentNode = parent.view.getNode();
+      if (parentNode.renderGroup) {
+        parentNode.renderGroup.addNode(this._text.getNode());
+      }
+    }
+    super.setParent(parent);
   }
 
   addChild(index: number, child: any) {
@@ -121,7 +152,7 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
 
   setRenderOrder(order: number) {
     super.setRenderOrder(order);
-    this._text.getNode().renderOrder = order;
+    this._text.getNode().renderOrder = order + 0.1;
   }
 
   measure(width: number, widthMeasureMode: number, height: number, heightMeasureMode: number) {
@@ -151,24 +182,17 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
     this._textDirty = true;
   }
 
-  getTextString(parentColor: number): string {
+  getTextString(): string {
     if (!this._textDirty) {
       return this._cachedText;
     }
-    const color = this._textColor == null ? parentColor : this._textColor;
-    const colorString =
-      String.fromCharCode(0) +
-      String.fromCharCode((color >>> 16) & 0xff) +
-      String.fromCharCode((color >>> 8) & 0xff) +
-      String.fromCharCode(color & 0xff) +
-      String.fromCharCode((color >>> 24) & 0xff);
     this._cachedText = '';
     for (let i = 0; i < this.textChildren.length; i++) {
       const child = this.textChildren[i];
       if (child instanceof RawText && child.text.length > 0) {
-        this._cachedText += colorString + child.text;
+        this._cachedText += child.text;
       } else if (child instanceof RCTText) {
-        this._cachedText += child.getTextString(color);
+        this._cachedText += child.getTextString();
       }
     }
     this._textDirty = false;
@@ -188,7 +212,7 @@ export default class RCTText extends ShadowViewWebGL<GLView> {
     }
     super.presentLayout();
     if (this._textDirty || this._geometryDirty) {
-      const textString = this.getTextString(0xff000000);
+      const textString = this.getTextString();
       this._text.setText(textString);
       this._text.update();
       this.YGNode.markDirty();

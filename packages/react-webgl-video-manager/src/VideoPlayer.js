@@ -21,14 +21,10 @@ export default class VideoPlayer {
   _impl: ?VideoPlayerImplementation;
   _manager: VideoManager;
   _load: Promise<TextureMetadata>;
-  _resolveImplementation: TextureMetadata => void;
 
   constructor(manager: VideoManager) {
     this._impl = null;
     this._manager = manager;
-    this._load = new Promise(resolve => {
-      this._resolveImplementation = resolve;
-    });
   }
 
   destroy() {
@@ -38,8 +34,11 @@ export default class VideoPlayer {
     this._impl.destroy();
   }
 
-  load(): Promise<TextureMetadata> {
-    return this._load;
+  getTexture() {
+    if (!this._impl) {
+      return;
+    }
+    return this._impl.getTexture();
   }
 
   pause() {
@@ -84,14 +83,12 @@ export default class VideoPlayer {
     this._impl.setMuted(muted);
   }
 
-  setSource(url: string, format?: string) {
+  setSource(url: string | Array<string>, format?: string) {
     // From extension, try to determine player
-    const impl = this._manager.createPlayerImplementation(url);
+    const sources = Array.isArray(url) ? url : [url];
+    const impl = this._manager.createPlayerImplementation(sources);
     this._impl = impl;
-    impl.setSource(url, format);
-    impl.load().then(tex => {
-      this._resolveImplementation(tex);
-    });
+    impl.setSource(sources, format);
   }
 
   setVolume(vol: number) {

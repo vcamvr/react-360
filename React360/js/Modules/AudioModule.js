@@ -19,10 +19,8 @@ import type {
 } from '../Compositor/Audio/Types';
 import type {Quaternion, Vec3} from '../Controls/Types';
 import type {ReactNativeContext} from '../ReactNativeContext';
-import {Math as GLMath} from 'webgl-ui';
+import {rotateByQuaternion} from '../Utils/Math';
 import Module from './Module';
-
-const {rotateByQuaternion} = GLMath;
 
 const FORWARD = [0, 0, -1];
 const UP = [0, 1, 0];
@@ -177,6 +175,28 @@ export default class AudioModule extends Module {
       return;
     }
     audio.stop();
+  }
+
+  /**
+   * Pause an audio track. It can be resumed by calling `play` again
+   */
+  pause(handle: string) {
+    const audio = this._handles[handle];
+    if (!audio) {
+      return;
+    }
+    audio.pause();
+  }
+
+  /**
+   * Move an audio track to a specific position, in seconds
+   */
+  seek(handle: string, time: number) {
+    const audio = this._handles[handle];
+    if (!audio) {
+      return;
+    }
+    audio.seekTo(time);
   }
 
   /**

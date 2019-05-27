@@ -9,20 +9,40 @@
  * @flow
  */
 
-import * as THREE from 'three';
+import * as WebGL from 'webgl-lite';
 import GLRoot from './GLRoot';
+import type {TextImplementation} from 'webgl-ui';
 
 export type RenderTargetRootOptions = {
-  scene?: any,
+  height?: number,
+  width?: number,
+  text?: TextImplementation,
 };
 
+/**
+ * RenderTargetRoot draws a React WebGL scene to a GL FrameBuffer / Texture,
+ * which can then be used in a larger WebGL scene.
+ */
 export default class RenderTargetRoot extends GLRoot {
-  constructor(options: RenderTargetRootOptions = {}) {
-    const scene = options.scene || new THREE.Scene();
-    super(scene);
+  constructor(gl: WebGLRenderingContext, options: RenderTargetRootOptions = {}) {
+    super(gl, options.text);
+    const width = options.width || 0;
+    const height = options.height || 0;
+    this._fb = new WebGL.FrameBuffer(gl, width, height);
+    this.getSurface().setViewport(width, height);
   }
 
-  showCursor() {
-    return false;
+  getFrameBuffer() {
+    return this._fb;
+  }
+
+  update() {
+    this._fb.drawToBuffer(() => {
+      const textureNeedsUpdate = this.getSurface().isDirty();
+      super.update();
+      if (textureNeedsUpdate) {
+        this._fb.getTexture().update();
+      }
+    });
   }
 }

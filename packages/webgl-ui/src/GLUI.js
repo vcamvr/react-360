@@ -15,11 +15,12 @@ import TextureManager from './TextureManager';
 import GLTexturedView from './primitives/GLTexturedView';
 import GLView from './primitives/GLView';
 import FontGeometry from './text/FontGeometry';
-import SDFTextImplementation from './text/Implementations/SDFTextImplementation';
 import Image from './views/Image';
 import RawText from './views/RawText';
 import ShadowView from './views/ShadowView';
 import ShadowViewWebGL from './views/ShadowViewWebGL';
+import SurfaceView from './views/SurfaceView';
+import Surface from './Surface';
 import Text from './views/Text';
 import View from './views/View';
 import * as Flexbox from './vendor/Yoga.bundle';
@@ -36,11 +37,12 @@ export {
   GLTexturedView,
   GLView,
   FontGeometry,
-  SDFTextImplementation,
   Image,
   RawText,
   ShadowView,
   ShadowViewWebGL,
+  SurfaceView,
+  Surface,
   Text,
   View,
   Flexbox,
