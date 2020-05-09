@@ -72,6 +72,7 @@ export type React360Options = {
   cameraFov?: number,
   // nativeModules?: Array<Module | NativeModuleInitializer>,
   eventLayer: HTMLElement,
+  speed?:number
 };
 
 const DEFAULT_SURFACE_DEPTH = 4;
@@ -216,7 +217,7 @@ export default class ReactInstance {
     const camera = this.compositor.getCamera();
     const fov = camera.fov * Math.PI / 180;
     this.controls.addCameraController(
-      new MousePanCameraController(this._eventLayer, fov),
+      new MousePanCameraController(this._eventLayer, fov,options),
     );
     this.controls.addCameraController(
       new DeviceOrientationCameraController(this._eventLayer, fov),

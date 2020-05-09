@@ -11,7 +11,7 @@
 
 import { type Quaternion, type Vec3 } from '../Types';
 import { type CameraController } from './Types';
-
+import {React360Options} from './../../ReactInstance'
 const DEFAULT_FOV = Math.PI / 3;
 const TWO_PI = Math.PI * 2;
 const HALF_PI = Math.PI / 2;
@@ -32,8 +32,11 @@ export default class MousePanCameraController implements CameraController {
   _lastTouchX: number;
   _lastTouchY: number;
   _verticalFov: number;
+  _DEFAULT_Y_ROTATION_DELATA:number
 
-  constructor(frame: HTMLElement, fov: number = DEFAULT_FOV) {
+  constructor(frame: HTMLElement, fov: number = DEFAULT_FOV,options:React360Options) {
+    
+    
     this._deltaYaw = 0;
     this._deltaPitch = 0;
     this._draggingMouse = false;
@@ -45,7 +48,10 @@ export default class MousePanCameraController implements CameraController {
     this._lastTouchX = 0;
     this._lastTouchY = 0;
     this._verticalFov = fov;
-
+    this._options=options;
+    let speed=options.speed
+    if(!speed)speed=1;
+    this._DEFAULT_Y_ROTATION_DELATA=speed *DEFAULT_Y_ROTATION_DELATA;
     (this: any)._onMouseDown = this._onMouseDown.bind(this);
     (this: any)._onMouseMove = this._onMouseMove.bind(this);
     (this: any)._onMouseUp = this._onMouseUp.bind(this);
@@ -151,8 +157,9 @@ export default class MousePanCameraController implements CameraController {
   }
 
   _autoMove() {
+    
     if (this.initMove === 1) {
-      this._deltaPitch -= DEFAULT_Y_ROTATION_DELATA;
+      this._deltaPitch -= this._DEFAULT_Y_ROTATION_DELATA;
     }
   }
 
