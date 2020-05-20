@@ -217,7 +217,7 @@ export default class ReactInstance {
     const camera = this.compositor.getCamera();
     const fov = camera.fov * Math.PI / 180;
     this.controls.addCameraController(
-      new MousePanCameraController(this._eventLayer, fov,options),
+      new MousePanCameraController(this._eventLayer, fov,options,this),
     );
     this.controls.addCameraController(
       new DeviceOrientationCameraController(this._eventLayer, fov),

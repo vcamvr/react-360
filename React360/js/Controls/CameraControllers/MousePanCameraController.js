@@ -11,14 +11,17 @@
 
 import { type Quaternion, type Vec3 } from '../Types';
 import { type CameraController } from './Types';
-import {React360Options} from './../../ReactInstance'
+import { React360Options } from './../../ReactInstance'
 const DEFAULT_FOV = Math.PI / 3;
 const TWO_PI = Math.PI * 2;
 const HALF_PI = Math.PI / 2;
 const DEFAULT_Y_ROTATION_DELATA = 0.0004;
 
-let _offsetYaw = 0;
-let _offsetPitch = 0;
+// let _offsetYaw = 0;
+// let _offsetPitch = 0;
+// let count = 0
+// flag = true
+// let lastVale = 1
 
 export default class MousePanCameraController implements CameraController {
   _deltaYaw: number;
@@ -32,11 +35,24 @@ export default class MousePanCameraController implements CameraController {
   _lastTouchX: number;
   _lastTouchY: number;
   _verticalFov: number;
-  _DEFAULT_Y_ROTATION_DELATA:number
+  _DEFAULT_Y_ROTATION_DELATA: number;
+  _rotateOnce: boolean;
+  _isRotateBegin: boolean;
+  _offsetYaw: number;
+  _offsetPitch: number;
+  _count: number;
+  _flag: boolean;
+  _lastVale: number;
+  ;
 
-  constructor(frame: HTMLElement, fov: number = DEFAULT_FOV,options:React360Options) {
-    
-    
+  constructor(frame: HTMLElement, fov: number = DEFAULT_FOV, options: React360Options, reactInstance) {
+    this._reactInstance = reactInstance
+
+    this._offsetYaw = 0;
+    this._offsetPitch = 0;
+    this._count = 0
+    this._flag = true
+    this._lastVale = 1
     this._deltaYaw = 0;
     this._deltaPitch = 0;
     this._draggingMouse = false;
@@ -48,10 +64,13 @@ export default class MousePanCameraController implements CameraController {
     this._lastTouchX = 0;
     this._lastTouchY = 0;
     this._verticalFov = fov;
-    this._options=options;
-    let speed=options.speed
-    if(!speed)speed=1;
-    this._DEFAULT_Y_ROTATION_DELATA=speed *DEFAULT_Y_ROTATION_DELATA;
+    this._options = options;
+    this._rotateOnce = options.rotateOnce;
+    this._isRotateBegin = true
+    let speed = options.speed
+    if (!speed) speed = 1;
+    this._DEFAULT_Y_ROTATION_DELATA = speed * DEFAULT_Y_ROTATION_DELATA;
+
     (this: any)._onMouseDown = this._onMouseDown.bind(this);
     (this: any)._onMouseMove = this._onMouseMove.bind(this);
     (this: any)._onMouseUp = this._onMouseUp.bind(this);
@@ -71,6 +90,8 @@ export default class MousePanCameraController implements CameraController {
     if (!this._enabled) {
       return;
     }
+    this.rotateOnce = false
+    this._reactInstance.stop()
     this._draggingMouse = true;
     this._lastMouseX = e.clientX;
     this._lastMouseY = e.clientY;
@@ -81,6 +102,7 @@ export default class MousePanCameraController implements CameraController {
     if (!this._draggingMouse) {
       return;
     }
+    this._reactInstance.start()
     const width = this._frame.clientWidth;
     const height = this._frame.clientHeight;
     const aspect = width / height;
@@ -90,6 +112,7 @@ export default class MousePanCameraController implements CameraController {
     this._lastMouseY = e.clientY;
     this._deltaPitch += deltaX / width * this._verticalFov * aspect;
     this._deltaYaw += deltaY / height * this._verticalFov;
+    this._reactInstance.stop()
   }
 
   _onMouseUp() {
@@ -131,14 +154,14 @@ export default class MousePanCameraController implements CameraController {
       // }
     } else {
       this._deltaYaw += deltaY / height * this._verticalFov * 2;
-      _offsetYaw += deltaY / height * this._verticalFov * 2;
-      if (_offsetYaw > HALF_PI) {
+      this._offsetYaw += deltaY / height * this._verticalFov * 2;
+      if (this._offsetYaw > HALF_PI) {
         this._deltaYaw = 0;
-        _offsetYaw = HALF_PI;
+        this._offsetYaw = HALF_PI;
       }
-      if (_offsetYaw < -HALF_PI) {
+      if (this._offsetYaw < -HALF_PI) {
         this._deltaYaw = 0;
-        _offsetYaw = -HALF_PI;
+        this._offsetYaw = -HALF_PI;
       }
     }
 
@@ -147,8 +170,8 @@ export default class MousePanCameraController implements CameraController {
 
   static getOffset() {
     return {
-      offsetYaw: _offsetYaw,
-      offsetPitch: _offsetPitch,
+      offsetYaw:this. _offsetYaw,
+      offsetPitch: this._offsetPitch,
     }
   }
 
@@ -157,9 +180,10 @@ export default class MousePanCameraController implements CameraController {
   }
 
   _autoMove() {
-    
+
     if (this.initMove === 1) {
       this._deltaPitch -= this._DEFAULT_Y_ROTATION_DELATA;
+
     }
   }
 
@@ -196,6 +220,29 @@ export default class MousePanCameraController implements CameraController {
     this._deltaPitch = 0;
   }
 
+  handleRotateOnce(rotation) {
+
+    let w = Math.abs(rotation[3])
+    
+    if (w === 1) return
+    if (this._count == 2) {
+      this._flag = true
+      this._count = 0
+      this._reactInstance.stop()
+      return
+    }
+    if (this._flag && this._lastVale < w) {
+      this._count++
+      this._flag = false
+    }
+    if (!this._flag && this._lastVale > w) {
+      this._count++
+      this._flag = true
+    }
+    this._lastVale = w
+
+  }
+
   fillCameraProperties(position: Vec3, rotation: Quaternion): boolean {
 
     if (!this._enabled) {
@@ -205,10 +252,9 @@ export default class MousePanCameraController implements CameraController {
     if (this._deltaPitch === 0 && this._deltaYaw === 0) {
       return false;
     }
-
+    this._rotateOnce && this.handleRotateOnce(rotation)
     // premultiply the camera rotation by the horizontal (pitch) rotation,
     // then multiply by the vertical (yaw) rotation
-
     const cp = Math.cos(this._deltaPitch / 2);
     const sp = Math.sin(this._deltaPitch / 2);
     const cy = Math.cos(this._deltaYaw / 2);
